@@ -1,13 +1,24 @@
-﻿import { NextResponse } from "next/server";
+﻿// src/app/api/books/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { getUserFromAuthHeader } from "@/lib/authServer";
 
-export async function GET(req: Request) {
+// replace these two lines at the top of the file
+// type EmptyParamsLike = {} | Promise<{}>;
+// type ContextWithEmptyParams = { params: EmptyParamsLike };
+
+// with these:
+type EmptyParamsLike = object | Promise<object>;
+type ContextWithEmptyParams = { params: EmptyParamsLike };
+
+
+export async function GET(request: NextRequest, _context: ContextWithEmptyParams) {
   try {
-    const user = await getUserFromAuthHeader(req.headers.get("authorization") ?? undefined);
+    const authHeader = request.headers.get("authorization") ?? undefined;
+    const user = await getUserFromAuthHeader(authHeader);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(request.url);
     const q = searchParams.get("q") ?? "";
     const statusFilter = searchParams.get("status") ?? "";
 
@@ -28,28 +39,35 @@ export async function GET(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     return NextResponse.json({ books: data ?? [] });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("GET /api/books error:", err);
-    return NextResponse.json({ error: String(err?.message ?? err) }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest, _context: ContextWithEmptyParams) {
   try {
-    const user = await getUserFromAuthHeader(req.headers.get("authorization") ?? undefined);
+    const authHeader = request.headers.get("authorization") ?? undefined;
+    const user = await getUserFromAuthHeader(authHeader);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const body = await req.json().catch(() => null);
-    const { title, author, status } = body ?? {};
+    const body = (await request.json().catch(() => null)) as
+      | { title?: unknown; author?: unknown; status?: unknown }
+      | null;
+
+    const title = body?.title ? String(body.title).trim() : "";
+    const author = body?.author ? String(body.author).trim() : "";
+    const status = body?.status ? String(body.status) : undefined;
 
     if (!title || !author) {
       return NextResponse.json({ error: "Missing title or author" }, { status: 400 });
     }
 
-    const payload: any = {
+    const payload = {
       user_id: user.id,
-      title: String(title).trim(),
-      author: String(author).trim(),
+      title,
+      author,
       status: status === "none" ? null : status ?? "reading",
     };
 
@@ -57,8 +75,9 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     return NextResponse.json({ book: data }, { status: 201 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("POST /api/books error:", err);
-    return NextResponse.json({ error: String(err?.message ?? err) }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
