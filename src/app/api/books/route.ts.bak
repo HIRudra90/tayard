@@ -1,5 +1,4 @@
-﻿// src/app/api/books/route.ts
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -36,8 +35,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const ct = req.headers.get("content-type") ?? "";
-    if (!ct.includes("application/json")) {
+    const contentType = req.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) {
       return NextResponse.json({ error: "Expected application/json" }, { status: 415 });
     }
 
@@ -53,10 +52,7 @@ export async function POST(req: Request) {
     const payload = {
       title: raw.title,
       author: typeof raw.author === "string" ? raw.author : null,
-      status:
-        raw.status === "reading" || raw.status === "completed" || raw.status === "wishlist"
-          ? String(raw.status)
-          : "wishlist",
+      status: raw.status === "reading" || raw.status === "completed" || raw.status === "wishlist" ? String(raw.status) : "wishlist",
     };
 
     const insertRes = await serverSupabase.from("books").insert([payload]).select();
@@ -66,6 +62,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: insertRes.error.message }, { status: 500 });
     }
 
+    // insertRes.data is the created row(s)
     return NextResponse.json(insertRes.data ?? [], { status: 201 });
   } catch (err: unknown) {
     console.error("Unexpected error in /api/books POST:", err);

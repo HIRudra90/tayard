@@ -1,5 +1,4 @@
 {
-  "/api/books/[id]/route": "app/api/books/[id]/route.js",
   "/api/books/route": "app/api/books/route.js",
   "/dashboard/page": "app/dashboard/page.js",
   "/favicon.ico/route": "app/favicon.ico/route.js"

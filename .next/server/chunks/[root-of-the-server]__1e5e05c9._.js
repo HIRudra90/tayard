@@ -89,6 +89,7 @@ module.exports = mod;
 "[project]/Desktop/Book Tracking/book-tracker/src/app/api/books/route.ts [app-route] (ecmascript)", ((__turbopack_context__) => {
 "use strict";
 
+// src/app/api/books/route.ts
 __turbopack_context__.s([
     "GET",
     ()=>GET,
@@ -102,12 +103,9 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f
 const supabaseUrl = ("TURBOPACK compile-time value", "https://ynjhypfadmthfpmpiqnk.supabase.co");
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!supabaseUrl || !serviceRoleKey) {
-    // fail fast so we don't try to call Supabase with undefined keys
-    console.error('Missing SUPABASE env vars on server. Ensure SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL are set.');
-    // It's better to throw here so that the dev server shows the problem immediately.
-    throw new Error('Missing SUPABASE env vars on server. Check SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL.');
+    console.error("Missing SUPABASE env vars on server. Ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.");
+    throw new Error("Missing SUPABASE env vars on server.");
 }
-// create server-side supabase client (do not persist sessions)
 const serverSupabase = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f40$supabase$2f$supabase$2d$js$2f$dist$2f$module$2f$index$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__$3c$locals$3e$__["createClient"])(supabaseUrl, serviceRoleKey, {
     auth: {
         persistSession: false
@@ -115,22 +113,23 @@ const serverSupabase = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Deskt
 });
 async function GET() {
     try {
-        const { data, error } = await serverSupabase.from('books').select('*').order('created_at', {
+        const { data, error } = await serverSupabase.from("books").select("*").order("created_at", {
             ascending: false
         });
         if (error) {
-            console.error('Supabase server error (GET /api/books):', error);
+            console.error("Supabase server error (GET /api/books):", error);
             return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
                 error: error.message
             }, {
                 status: 500
             });
         }
-        return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json(data ?? [], {
+        const rows = Array.isArray(data) ? data : [];
+        return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json(rows, {
             status: 200
         });
     } catch (err) {
-        console.error('Unexpected error in /api/books GET:', err);
+        console.error("Unexpected error in /api/books GET:", err);
         return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
             error: String(err)
         }, {
@@ -140,34 +139,50 @@ async function GET() {
 }
 async function POST(req) {
     try {
-        const body = await req.json();
-        if (!body?.title) return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-            error: 'Missing title'
-        }, {
-            status: 400
-        });
-        const insertPayload = {
-            title: body.title,
-            author: body.author ?? null,
-            status: body.status ?? 'wishlist'
-        };
-        // Insert and return the inserted row (use select() to get inserted row back)
-        const { data, error } = await serverSupabase.from('books').insert([
-            insertPayload
-        ]).select().maybeSingle();
-        if (error) {
-            console.error('Insert error (POST /api/books):', error);
+        const ct = req.headers.get("content-type") ?? "";
+        if (!ct.includes("application/json")) {
             return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-                error: error.message
+                error: "Expected application/json"
+            }, {
+                status: 415
+            });
+        }
+        const raw = await req.json();
+        if (!raw || typeof raw !== "object") {
+            return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                error: "Invalid body"
+            }, {
+                status: 400
+            });
+        }
+        if (!raw.title || typeof raw.title !== "string") {
+            return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                error: "Missing or invalid title"
+            }, {
+                status: 400
+            });
+        }
+        const payload = {
+            title: raw.title,
+            author: typeof raw.author === "string" ? raw.author : null,
+            status: raw.status === "reading" || raw.status === "completed" || raw.status === "wishlist" ? String(raw.status) : "wishlist"
+        };
+        const insertRes = await serverSupabase.from("books").insert([
+            payload
+        ]).select();
+        if (insertRes.error) {
+            console.error("Insert error (POST /api/books):", insertRes.error);
+            return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                error: insertRes.error.message
             }, {
                 status: 500
             });
         }
-        return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json(data, {
+        return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json(insertRes.data ?? [], {
             status: 201
         });
     } catch (err) {
-        console.error('Unexpected error in /api/books POST:', err);
+        console.error("Unexpected error in /api/books POST:", err);
         return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
             error: String(err)
         }, {

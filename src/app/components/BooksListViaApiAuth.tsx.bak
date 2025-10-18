@@ -1,5 +1,4 @@
-﻿// src/app/components/BooksListViaApiAuth.tsx
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 
 type Book = {
   id: string;
@@ -26,7 +25,7 @@ export default function BooksListViaApiAuth(): JSX.Element {
           throw new Error(txt || `Server ${res.status}`);
         }
         const data = await res.json();
-        const arr: Book[] = Array.isArray(data) ? data : Array.isArray((data as any)?.books) ? (data as any).books : [];
+        const arr: Book[] = Array.isArray(data) ? data : Array.isArray(data?.books) ? data.books : [];
         if (mounted) setBooks(arr);
       } catch (err: unknown) {
         if (mounted) setError(String(err));
