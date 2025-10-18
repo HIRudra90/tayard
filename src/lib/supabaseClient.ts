@@ -1,7 +1,12 @@
-﻿"use client";
-import { createClient } from "@supabase/supabase-js";
+﻿// src/lib/supabaseClient.ts
+import { createClient } from '@supabase/supabase-js';
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-export const supabase = createClient(url, anonKey);
+if (!supabaseUrl || !supabaseAnonKey) {
+  // This helps quickly surface env problems in the browser console
+  console.error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
