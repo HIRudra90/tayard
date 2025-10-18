@@ -1,59 +1,60 @@
-﻿'use client';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+﻿"use client";
+
+import React, { useEffect, useState } from "react";
+
+type Book = {
+  id: string;
+  title: string;
+  author?: string | null;
+  status?: string | null;
+};
+
+function safeLog(e: unknown, prefix = "") {
+  if (e instanceof Error) {
+    // eslint-disable-next-line no-console
+    console.error(prefix, e.message, e);
+  } else {
+    // eslint-disable-next-line no-console
+    console.error(prefix, e);
+  }
+}
 
 export default function BooksListViaApiAuth() {
-  const [books, setBooks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [books, setBooks] = useState<Book[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     async function load() {
-      setLoading(true);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) {
-          setError('Not signed in');
-          setLoading(false);
-          return;
-        }
-
-        const res = await fetch('/api/books', {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        const payload = await res.json();
-        if (!res.ok) {
-          setError(payload?.error ?? `Request failed (${res.status})`);
-        } else {
-          setBooks(payload.books ?? []);
-        }
-      } catch (err: any) {
-        setError(err?.message ?? String(err));
-      } finally {
-        setLoading(false);
+        const res = await fetch("/api/books");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as Book[];
+        if (mounted) setBooks(Array.isArray(data) ? data : []);
+      } catch (e: unknown) {
+        safeLog(e, "BooksListViaApiAuth load error:");
+        if (mounted) setError("Failed to load books");
       }
     }
 
     load();
-    const { data: listener } = supabase.auth.onAuthStateChange(() => load());
-    return () => listener?.subscription?.unsubscribe?.();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  if (loading) return <div>Loading…</div>;
-  if (error) return <div style={{ color: 'red' }}>Error: {error}</div>;
+  if (error) return <div style={{ color: "#f87171" }}>{error}</div>;
 
   return (
-    <ul>
-      {books.map((b: any) => (
-        <li key={b.id}>
-          {b.title} — {b.author}
-        </li>
+    <div>
+      {books.map((b) => (
+        <div key={b.id} style={{ padding: 8, borderBottom: "1px solid #eee" }}>
+          <div style={{ fontWeight: 700 }}>{b.title}</div>
+          <div style={{ color: "#6b7280" }}>{b.author}</div>
+          <div style={{ fontSize: 12, marginTop: 6 }}>{b.status}</div>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
