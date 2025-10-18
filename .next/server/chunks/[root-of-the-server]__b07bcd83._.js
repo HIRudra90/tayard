@@ -1,5 +1,5 @@
 module.exports = [
-"[project]/Desktop/Book Tracking/book-tracker/.next-internal/server/app/api/books/route/actions.js [app-rsc] (server actions loader, ecmascript)", ((__turbopack_context__, module, exports) => {
+"[project]/Desktop/Book Tracking/book-tracker/.next-internal/server/app/api/books/[id]/route/actions.js [app-rsc] (server actions loader, ecmascript)", ((__turbopack_context__, module, exports) => {
 
 }),
 "[externals]/next/dist/compiled/next-server/app-route-turbo.runtime.dev.js [external] (next/dist/compiled/next-server/app-route-turbo.runtime.dev.js, cjs)", ((__turbopack_context__, module, exports) => {
@@ -86,14 +86,15 @@ const mod = __turbopack_context__.x("zlib", () => require("zlib"));
 
 module.exports = mod;
 }),
-"[project]/Desktop/Book Tracking/book-tracker/src/app/api/books/route.ts [app-route] (ecmascript)", ((__turbopack_context__) => {
+"[project]/Desktop/Book Tracking/book-tracker/src/app/api/books/[id]/route.ts [app-route] (ecmascript)", ((__turbopack_context__) => {
 "use strict";
 
+// src/app/api/books/[id]/route.ts
 __turbopack_context__.s([
-    "GET",
-    ()=>GET,
-    "POST",
-    ()=>POST
+    "DELETE",
+    ()=>DELETE,
+    "PATCH",
+    ()=>PATCH
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/Desktop/Book Tracking/book-tracker/node_modules/next/server.js [app-route] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f40$supabase$2f$supabase$2d$js$2f$dist$2f$module$2f$index$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/Desktop/Book Tracking/book-tracker/node_modules/@supabase/supabase-js/dist/module/index.js [app-route] (ecmascript) <locals>");
@@ -102,35 +103,53 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f
 const supabaseUrl = ("TURBOPACK compile-time value", "https://ynjhypfadmthfpmpiqnk.supabase.co");
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!supabaseUrl || !serviceRoleKey) {
-    // fail fast so we don't try to call Supabase with undefined keys
-    console.error('Missing SUPABASE env vars on server. Ensure SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL are set.');
-    // It's better to throw here so that the dev server shows the problem immediately.
-    throw new Error('Missing SUPABASE env vars on server. Check SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL.');
+    console.error('Missing SUPABASE env vars on server. Ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.');
 }
-// create server-side supabase client (do not persist sessions)
-const serverSupabase = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f40$supabase$2f$supabase$2d$js$2f$dist$2f$module$2f$index$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__$3c$locals$3e$__["createClient"])(supabaseUrl, serviceRoleKey, {
-    auth: {
-        persistSession: false
-    }
-});
-async function GET() {
-    try {
-        const { data, error } = await serverSupabase.from('books').select('*').order('created_at', {
-            ascending: false
+const serverSupabase = supabaseUrl && serviceRoleKey ? (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f40$supabase$2f$supabase$2d$js$2f$dist$2f$module$2f$index$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__$3c$locals$3e$__["createClient"])(supabaseUrl, serviceRoleKey) : null;
+async function PATCH(req, { params }) {
+    const id = params.id;
+    if (!serverSupabase) {
+        return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            error: 'Server configuration error: missing Supabase keys'
+        }, {
+            status: 500
         });
-        if (error) {
-            console.error('Supabase server error (GET /api/books):', error);
+    }
+    try {
+        const body = await req.json();
+        if (!body || Object.keys(body).length === 0) {
             return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-                error: error.message
+                error: 'No update payload provided'
             }, {
-                status: 500
+                status: 400
             });
         }
-        return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json(data ?? [], {
+        // allow only certain fields
+        const allowed = {};
+        if (body.status) allowed.status = body.status;
+        if (body.title) allowed.title = body.title;
+        if ('author' in body) allowed.author = body.author;
+        if (Object.keys(allowed).length === 0) {
+            return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                error: 'No valid fields to update'
+            }, {
+                status: 400
+            });
+        }
+        const { data, error, status } = await serverSupabase.from('books').update(allowed).eq('id', id).select().single();
+        if (error) {
+            console.error(`Supabase PATCH /books/${id} error`, error);
+            return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                error: error.message || 'Supabase update error'
+            }, {
+                status: status ?? 500
+            });
+        }
+        return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json(data, {
             status: 200
         });
     } catch (err) {
-        console.error('Unexpected error in /api/books GET:', err);
+        console.error(`Unexpected PATCH /api/books/${id} error`, err);
         return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
             error: String(err)
         }, {
@@ -138,36 +157,32 @@ async function GET() {
         });
     }
 }
-async function POST(req) {
-    try {
-        const body = await req.json();
-        if (!body?.title) return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-            error: 'Missing title'
+async function DELETE(_req, { params }) {
+    const id = params.id;
+    if (!serverSupabase) {
+        return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            error: 'Server configuration error: missing Supabase keys'
         }, {
-            status: 400
+            status: 500
         });
-        const insertPayload = {
-            title: body.title,
-            author: body.author ?? null,
-            status: body.status ?? 'wishlist'
-        };
-        // Insert and return the inserted row (use select() to get inserted row back)
-        const { data, error } = await serverSupabase.from('books').insert([
-            insertPayload
-        ]).select().maybeSingle();
+    }
+    try {
+        const { data, error, status } = await serverSupabase.from('books').delete().eq('id', id);
         if (error) {
-            console.error('Insert error (POST /api/books):', error);
+            console.error(`Supabase DELETE /books/${id} error`, error);
             return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-                error: error.message
+                error: error.message || 'Supabase delete error'
             }, {
-                status: 500
+                status: status ?? 500
             });
         }
-        return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json(data, {
-            status: 201
+        return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            success: true
+        }, {
+            status: 200
         });
     } catch (err) {
-        console.error('Unexpected error in /api/books POST:', err);
+        console.error(`Unexpected DELETE /api/books/${id} error`, err);
         return __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
             error: String(err)
         }, {
@@ -178,4 +193,4 @@ async function POST(req) {
 }),
 ];
 
-//# sourceMappingURL=%5Broot-of-the-server%5D__1e5e05c9._.js.map
+//# sourceMappingURL=%5Broot-of-the-server%5D__b07bcd83._.js.map

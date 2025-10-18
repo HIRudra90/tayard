@@ -33,7 +33,7 @@ export default function DashboardPage() {
   // default server-safe theme; loaded from localStorage on client
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
-  const statusMeta: Record<string, { bg: string; text: string }> = {
+  const statusMeta: Record<'wishlist' | 'reading' | 'completed', { bg: string; text: string }> = {
     wishlist: { bg: '#60a5fa', text: '#041022' },
     reading: { bg: '#facc15', text: '#031527' },
     completed: { bg: '#10b981', text: '#031527' },
@@ -61,7 +61,8 @@ export default function DashboardPage() {
         throw new Error(txt || `Server responded ${res.status}`);
       }
       const data = await res.json();
-      setBooks(Array.isArray(data) ? data : []);
+      // If your API returns { books: [...] } adapt accordingly.
+      setBooks(Array.isArray(data) ? data : Array.isArray(data?.books) ? data.books : []);
     } catch (e: unknown) {
       logUnknownError(e, 'fetchBooks error:');
       setError('Failed to load books (see console).');
@@ -73,7 +74,7 @@ export default function DashboardPage() {
   useEffect(() => {
     // load theme on client (avoids SSR/CSR mismatch)
     try {
-      const stored = localStorage.getItem('booktracker_theme') as 'dark' | 'light' | null;
+      const stored = (localStorage.getItem('booktracker_theme') as 'dark' | 'light' | null);
       if (stored && (stored === 'dark' || stored === 'light')) setTheme(stored);
     } catch {
       // ignore localStorage errors
@@ -94,7 +95,7 @@ export default function DashboardPage() {
     try {
       localStorage.setItem('booktracker_theme', theme);
     } catch {
-      // ignore
+      // ignore localStorage errors
     }
   }, [theme]);
 
@@ -129,7 +130,7 @@ export default function DashboardPage() {
     }
   };
 
-  const updateStatus = async (id: string, newStatus: string) => {
+  const updateStatus = async (id: string, newStatus: 'wishlist' | 'reading' | 'completed') => {
     // optimistic UI
     setBooks((prev) => prev.map((b) => (b.id === id ? { ...b, status: newStatus } : b)));
     setOpenMenuId(null);
@@ -152,7 +153,7 @@ export default function DashboardPage() {
   };
 
   const removeBook = async (id: string) => {
-    if (!confirm('Delete this book?')) return;
+    if (!window.confirm('Delete this book?')) return;
     try {
       const res = await fetch(`/api/books/${id}`, { method: 'DELETE' });
       if (!res.ok) {
@@ -277,21 +278,37 @@ export default function DashboardPage() {
             <button onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} style={buttonGhost}>
               {isDark ? 'Lite' : 'Dark'}
             </button>
-            <button onClick={fetchBooks} style={buttonGhost}>Refresh</button>
+            <button onClick={fetchBooks} style={buttonGhost}>
+              Refresh
+            </button>
           </div>
         </div>
 
         {/* Search Row */}
         <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
           <input placeholder="Search by title or author" value={search} onChange={(e) => setSearch(e.target.value)} style={{ ...inputBase, flex: 1 }} />
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)} style={{ ...inputBase, width: 160 }}>
+          <select
+            value={filterStatus}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+              setFilterStatus(e.target.value as 'all' | 'wishlist' | 'reading' | 'completed')
+            }
+            style={{ ...inputBase, width: 160 }}
+          >
             <option value="all">All statuses</option>
             <option value="wishlist">Wishlist</option>
             <option value="reading">Reading</option>
             <option value="completed">Completed</option>
           </select>
           <div style={{ marginLeft: 'auto' }}>
-            <button onClick={() => { setSearch(''); setFilterStatus('all'); }} style={buttonGhost}>Clear</button>
+            <button
+              onClick={() => {
+                setSearch('');
+                setFilterStatus('all');
+              }}
+              style={buttonGhost}
+            >
+              Clear
+            </button>
           </div>
         </div>
 
@@ -299,7 +316,18 @@ export default function DashboardPage() {
         <form onSubmit={onAdd} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
           <input placeholder="Title (required)" value={title} onChange={(e) => setTitle(e.target.value)} style={inputBase} />
           <input placeholder="Author (optional)" value={author} onChange={(e) => setAuthor(e.target.value)} style={{ ...inputBase, width: 320 }} />
-          <select value={addStatus} onChange={(e) => setAddStatus(e.target.value as any)} style={{ padding: '10px 14px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.06)', background: statusMeta[addStatus].bg, color: statusMeta[addStatus].text, fontWeight: 800 }}>
+          <select
+            value={addStatus}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setAddStatus(e.target.value as 'wishlist' | 'reading' | 'completed')}
+            style={{
+              padding: '10px 14px',
+              borderRadius: 6,
+              border: '1px solid rgba(0,0,0,0.06)',
+              background: statusMeta[addStatus].bg,
+              color: statusMeta[addStatus].text,
+              fontWeight: 800,
+            }}
+          >
             <option value="wishlist">Wishlist</option>
             <option value="reading">Reading</option>
             <option value="completed">Completed</option>
@@ -309,11 +337,26 @@ export default function DashboardPage() {
             <button type="submit" disabled={saving} style={buttonPrimary}>
               {saving ? 'Adding…' : 'Add'}
             </button>
-            <button type="button" onClick={() => { setTitle(''); setAuthor(''); setAddStatus('wishlist'); setError(null); }} style={buttonGhost}>Clear</button>
+            <button
+              type="button"
+              onClick={() => {
+                setTitle('');
+                setAuthor('');
+                setAddStatus('wishlist');
+                setError(null);
+              }}
+              style={buttonGhost}
+            >
+              Clear
+            </button>
           </div>
         </form>
 
-        {error && <div style={{ color: '#ff8080', marginTop: 8 }}>{error}</div>}
+        {error && (
+          <div style={{ color: '#ff8080', marginTop: 8 }}>
+            {error}
+          </div>
+        )}
 
         <div style={{ display: 'grid', gap: 14, marginTop: 12 }}>
           {loading ? (
@@ -337,7 +380,10 @@ export default function DashboardPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{ position: 'relative', display: 'inline-block' }}>
                       <div
-                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(isOpen ? null : b.id); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(isOpen ? null : b.id);
+                        }}
                         style={{
                           ...pillButton(meta.bg, meta.text),
                           background: isDark ? meta.bg : meta.bg,
@@ -355,7 +401,12 @@ export default function DashboardPage() {
                             const itemBg = s === st ? (isDark ? '#0b2b3a' : '#f6fbff') : (isDark ? '#06202e' : '#fff');
                             const textColor = s === st ? m.text : isDark ? '#e6eef7' : '#07203a';
                             return (
-                              <div key={s} role="button" onClick={() => updateStatus(b.id, s)} style={{ padding: '12px 14px', cursor: 'pointer', background: itemBg, color: textColor, fontWeight: 800 }}>
+                              <div
+                                key={s}
+                                role="button"
+                                onClick={() => updateStatus(b.id, s)}
+                                style={{ padding: '12px 14px', cursor: 'pointer', background: itemBg, color: textColor, fontWeight: 800 }}
+                              >
                                 <span style={{ width: 10, height: 10, borderRadius: 999, background: m.bg, display: 'inline-block', marginRight: 10 }} />
                                 <span style={{ textTransform: 'capitalize' }}>{s}</span>
                               </div>
@@ -365,7 +416,9 @@ export default function DashboardPage() {
                       )}
                     </div>
 
-                    <button onClick={() => removeBook(b.id)} style={{ padding: '10px 14px', borderRadius: 6, background: '#2563eb', color: '#fff', fontWeight: 700, border: 'none' }}>Delete</button>
+                    <button onClick={() => removeBook(b.id)} style={{ padding: '10px 14px', borderRadius: 6, background: '#2563eb', color: '#fff', fontWeight: 700, border: 'none' }}>
+                      Delete
+                    </button>
 
                     <div style={{ color: muted, fontSize: 12 }}>{b.created_at ? formatIsoTimestamp(b.created_at) : ''}</div>
                   </div>

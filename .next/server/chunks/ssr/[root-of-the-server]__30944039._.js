@@ -75,7 +75,8 @@ function DashboardPage() {
                 throw new Error(txt || `Server responded ${res.status}`);
             }
             const data = await res.json();
-            setBooks(Array.isArray(data) ? data : []);
+            // If your API returns { books: [...] } adapt accordingly.
+            setBooks(Array.isArray(data) ? data : Array.isArray(data?.books) ? data.books : []);
         } catch (e) {
             logUnknownError(e, 'fetchBooks error:');
             setError('Failed to load books (see console).');
@@ -105,7 +106,7 @@ function DashboardPage() {
         try {
             localStorage.setItem('booktracker_theme', theme);
         } catch  {
-        // ignore
+        // ignore localStorage errors
         }
     }, [
         theme
@@ -175,7 +176,7 @@ function DashboardPage() {
         }
     };
     const removeBook = async (id)=>{
-        if (!confirm('Delete this book?')) return;
+        if (!window.confirm('Delete this book?')) return;
         try {
             const res = await fetch(`/api/books/${id}`, {
                 method: 'DELETE'
@@ -299,7 +300,7 @@ function DashboardPage() {
                                     children: "Your Books"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 273,
+                                    lineNumber: 274,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -309,13 +310,13 @@ function DashboardPage() {
                                     children: "Dashboard To Get Hired"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 274,
+                                    lineNumber: 275,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 272,
+                            lineNumber: 273,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -330,7 +331,7 @@ function DashboardPage() {
                                     children: isDark ? 'Lite' : 'Dark'
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 277,
+                                    lineNumber: 278,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -339,19 +340,19 @@ function DashboardPage() {
                                     children: "Refresh"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 280,
+                                    lineNumber: 281,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 276,
+                            lineNumber: 277,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                    lineNumber: 271,
+                    lineNumber: 272,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -372,7 +373,7 @@ function DashboardPage() {
                             }
                         }, void 0, false, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 286,
+                            lineNumber: 289,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
@@ -388,7 +389,7 @@ function DashboardPage() {
                                     children: "All statuses"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 288,
+                                    lineNumber: 297,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -396,7 +397,7 @@ function DashboardPage() {
                                     children: "Wishlist"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 289,
+                                    lineNumber: 298,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -404,7 +405,7 @@ function DashboardPage() {
                                     children: "Reading"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 290,
+                                    lineNumber: 299,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -412,13 +413,13 @@ function DashboardPage() {
                                     children: "Completed"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 291,
+                                    lineNumber: 300,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 287,
+                            lineNumber: 290,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -434,18 +435,18 @@ function DashboardPage() {
                                 children: "Clear"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                lineNumber: 294,
+                                lineNumber: 303,
                                 columnNumber: 13
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 293,
+                            lineNumber: 302,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                    lineNumber: 285,
+                    lineNumber: 288,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -464,7 +465,7 @@ function DashboardPage() {
                             style: inputBase
                         }, void 0, false, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 300,
+                            lineNumber: 317,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -477,7 +478,7 @@ function DashboardPage() {
                             }
                         }, void 0, false, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 301,
+                            lineNumber: 318,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
@@ -497,7 +498,7 @@ function DashboardPage() {
                                     children: "Wishlist"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 303,
+                                    lineNumber: 331,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -505,7 +506,7 @@ function DashboardPage() {
                                     children: "Reading"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 304,
+                                    lineNumber: 332,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -513,13 +514,13 @@ function DashboardPage() {
                                     children: "Completed"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 305,
+                                    lineNumber: 333,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 302,
+                            lineNumber: 319,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -536,7 +537,7 @@ function DashboardPage() {
                                     children: saving ? 'Adding…' : 'Add'
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 309,
+                                    lineNumber: 337,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -551,19 +552,19 @@ function DashboardPage() {
                                     children: "Clear"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 312,
+                                    lineNumber: 340,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 308,
+                            lineNumber: 336,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                    lineNumber: 299,
+                    lineNumber: 316,
                     columnNumber: 9
                 }, this),
                 error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -574,8 +575,8 @@ function DashboardPage() {
                     children: error
                 }, void 0, false, {
                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                    lineNumber: 316,
-                    columnNumber: 19
+                    lineNumber: 356,
+                    columnNumber: 11
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                     style: {
@@ -590,7 +591,7 @@ function DashboardPage() {
                         children: "Loading…"
                     }, void 0, false, {
                         fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                        lineNumber: 320,
+                        lineNumber: 363,
                         columnNumber: 13
                     }, this) : visible.length ? visible.map((b, i)=>{
                         const st = b.status ?? 'wishlist';
@@ -613,7 +614,7 @@ function DashboardPage() {
                                             children: b.title
                                         }, void 0, false, {
                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                            lineNumber: 330,
+                                            lineNumber: 373,
                                             columnNumber: 21
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -630,19 +631,19 @@ function DashboardPage() {
                                                     children: b.status ?? '—'
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                                    lineNumber: 333,
+                                                    lineNumber: 376,
                                                     columnNumber: 23
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                            lineNumber: 331,
+                                            lineNumber: 374,
                                             columnNumber: 21
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 329,
+                                    lineNumber: 372,
                                     columnNumber: 19
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -679,7 +680,7 @@ function DashboardPage() {
                                                             }
                                                         }, void 0, false, {
                                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                                            lineNumber: 347,
+                                                            lineNumber: 393,
                                                             columnNumber: 25
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -689,13 +690,13 @@ function DashboardPage() {
                                                             children: st
                                                         }, void 0, false, {
                                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                                            lineNumber: 348,
+                                                            lineNumber: 394,
                                                             columnNumber: 25
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                                    lineNumber: 339,
+                                                    lineNumber: 382,
                                                     columnNumber: 23
                                                 }, this),
                                                 isOpen && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -727,7 +728,7 @@ function DashboardPage() {
                                                                     }
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                                                    lineNumber: 359,
+                                                                    lineNumber: 410,
                                                                     columnNumber: 33
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -737,25 +738,25 @@ function DashboardPage() {
                                                                     children: s
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                                                    lineNumber: 360,
+                                                                    lineNumber: 411,
                                                                     columnNumber: 33
                                                                 }, this)
                                                             ]
                                                         }, s, true, {
                                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                                            lineNumber: 358,
+                                                            lineNumber: 404,
                                                             columnNumber: 31
                                                         }, this);
                                                     })
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                                    lineNumber: 352,
+                                                    lineNumber: 398,
                                                     columnNumber: 25
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                            lineNumber: 338,
+                                            lineNumber: 381,
                                             columnNumber: 21
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -771,7 +772,7 @@ function DashboardPage() {
                                             children: "Delete"
                                         }, void 0, false, {
                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                            lineNumber: 368,
+                                            lineNumber: 419,
                                             columnNumber: 21
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -782,19 +783,19 @@ function DashboardPage() {
                                             children: b.created_at ? formatIsoTimestamp(b.created_at) : ''
                                         }, void 0, false, {
                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                            lineNumber: 370,
+                                            lineNumber: 423,
                                             columnNumber: 21
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 337,
+                                    lineNumber: 380,
                                     columnNumber: 19
                                 }, this)
                             ]
                         }, b.id, true, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 328,
+                            lineNumber: 371,
                             columnNumber: 17
                         }, this);
                     }) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -804,12 +805,12 @@ function DashboardPage() {
                         children: "No books yet — add one above."
                     }, void 0, false, {
                         fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                        lineNumber: 376,
+                        lineNumber: 429,
                         columnNumber: 13
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                    lineNumber: 318,
+                    lineNumber: 361,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -824,25 +825,25 @@ function DashboardPage() {
                             children: ".env.local"
                         }, void 0, false, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 381,
+                            lineNumber: 434,
                             columnNumber: 125
                         }, this),
                         "."
                     ]
                 }, void 0, true, {
                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                    lineNumber: 380,
+                    lineNumber: 433,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-            lineNumber: 270,
+            lineNumber: 271,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-        lineNumber: 269,
+        lineNumber: 270,
         columnNumber: 5
     }, this);
 }
