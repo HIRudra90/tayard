@@ -34,6 +34,7 @@ function DashboardPage() {
     const [error, setError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [openMenuId, setOpenMenuId] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const containerRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    // default server-safe theme; loaded from localStorage on client
     const [theme, setTheme] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])('dark');
     const statusMeta = {
         wishlist: {
@@ -49,24 +50,45 @@ function DashboardPage() {
             text: '#031527'
         }
     };
+    // Helper to log unknown errors safely
+    function logUnknownError(e) {
+        let prefix = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : '';
+        if (e instanceof Error) {
+            // eslint-disable-next-line no-console
+            console.error(prefix, e.message, e);
+        } else {
+            // eslint-disable-next-line no-console
+            console.error(prefix, e);
+        }
+    }
+    // fetch books
     const fetchBooks = async ()=>{
         setLoading(true);
+        setError(null);
         try {
             const res = await fetch('/api/books');
-            if (!res.ok) throw new Error(await res.text());
-            setBooks(await res.json());
+            if (!res.ok) {
+                const txt = await res.text().catch(()=>'Failed to read error body');
+                throw new Error(txt || "Server responded ".concat(res.status));
+            }
+            const data = await res.json();
+            setBooks(Array.isArray(data) ? data : []);
         } catch (e) {
-            setError('Failed to load books.');
+            logUnknownError(e, 'fetchBooks error:');
+            setError('Failed to load books (see console).');
         } finally{
             setLoading(false);
         }
     };
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "DashboardPage.useEffect": ()=>{
+            // load theme on client (avoids SSR/CSR mismatch)
             try {
                 const stored = localStorage.getItem('booktracker_theme');
-                if (stored) setTheme(stored);
-            } catch (e) {}
+                if (stored && (stored === 'dark' || stored === 'light')) setTheme(stored);
+            } catch (e) {
+            // ignore localStorage errors
+            }
             fetchBooks();
             const clickHandler = {
                 "DashboardPage.useEffect.clickHandler": (e)=>{
@@ -79,18 +101,28 @@ function DashboardPage() {
             return ({
                 "DashboardPage.useEffect": ()=>document.removeEventListener('click', clickHandler)
             })["DashboardPage.useEffect"];
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         }
     }["DashboardPage.useEffect"], []);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "DashboardPage.useEffect": ()=>{
-            localStorage.setItem('booktracker_theme', theme);
+            try {
+                localStorage.setItem('booktracker_theme', theme);
+            } catch (e) {
+            // ignore
+            }
         }
     }["DashboardPage.useEffect"], [
         theme
     ]);
     const onAdd = async (e)=>{
         e === null || e === void 0 ? void 0 : e.preventDefault();
-        if (!title.trim()) return setError('Title required');
+        setError(null);
+        const t = title.trim();
+        if (!t) {
+            setError('Title required');
+            return;
+        }
         setSaving(true);
         try {
             const res = await fetch('/api/books', {
@@ -99,23 +131,28 @@ function DashboardPage() {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    title,
-                    author,
+                    title: t,
+                    author: author.trim() || null,
                     status: addStatus
                 })
             });
-            if (!res.ok) throw new Error(await res.text());
+            if (!res.ok) {
+                const txt = await res.text().catch(()=>'server error');
+                throw new Error(txt || "Server ".concat(res.status));
+            }
             setTitle('');
             setAuthor('');
             setAddStatus('wishlist');
-            fetchBooks();
+            await fetchBooks();
         } catch (e) {
-            setError('Failed to add book.');
+            logUnknownError(e, 'onAdd error:');
+            setError('Failed to add book (see console).');
         } finally{
             setSaving(false);
         }
     };
     const updateStatus = async (id, newStatus)=>{
+        // optimistic UI
         setBooks((prev)=>prev.map((b)=>b.id === id ? {
                     ...b,
                     status: newStatus
@@ -131,26 +168,41 @@ function DashboardPage() {
                     status: newStatus
                 })
             });
-            if (!res.ok) throw new Error(await res.text());
+            if (!res.ok) {
+                const txt = await res.text().catch(()=>'server error');
+                throw new Error(txt || "Server ".concat(res.status));
+            }
         } catch (e) {
-            setError('Failed to update status.');
+            logUnknownError(e, 'updateStatus error:');
+            setError('Failed to update status (see console).');
+            // revert by refetching fresh server state
+            fetchBooks();
         }
     };
     const removeBook = async (id)=>{
         if (!confirm('Delete this book?')) return;
         try {
-            await fetch("/api/books/".concat(id), {
+            const res = await fetch("/api/books/".concat(id), {
                 method: 'DELETE'
             });
+            if (!res.ok) {
+                const txt = await res.text().catch(()=>'server error');
+                throw new Error(txt || "Server ".concat(res.status));
+            }
             setBooks((prev)=>prev.filter((b)=>b.id !== id));
         } catch (e) {
-            setError('Delete failed.');
+            logUnknownError(e, 'removeBook error:');
+            setError('Delete failed (see console).');
+            fetchBooks();
         }
     };
     const visible = books.filter((b)=>filterStatus === 'all' ? true : b.status === filterStatus).filter((b)=>{
+        if (!search.trim()) return true;
+        const q = search.toLowerCase();
         var _b_title, _b_author;
-        return ((_b_title = b.title) !== null && _b_title !== void 0 ? _b_title : '').toLowerCase().includes(search.toLowerCase()) || ((_b_author = b.author) !== null && _b_author !== void 0 ? _b_author : '').toLowerCase().includes(search.toLowerCase());
+        return ((_b_title = b.title) !== null && _b_title !== void 0 ? _b_title : '').toLowerCase().includes(q) || ((_b_author = b.author) !== null && _b_author !== void 0 ? _b_author : '').toLowerCase().includes(q);
     });
+    // ----- styling (kept same as previous) -----
     const isDark = theme === 'dark';
     const borderColor = isDark ? 'rgba(255,255,255,0.25)' : 'rgba(30,58,138,0.25)';
     const muted = isDark ? '#9aa7b6' : '#4b5563';
@@ -169,7 +221,13 @@ function DashboardPage() {
     const buttonPrimary = {
         ...buttonBase,
         background: buttonBlue,
-        color: '#fff'
+        color: '#fff',
+        boxShadow: isDark ? '0 4px 10px rgba(79,155,255,0.14)' : '0 4px 14px rgba(37,99,235,0.18)'
+    };
+    const buttonGhost = {
+        ...buttonBase,
+        background: isDark ? '#0b1a29' : '#f2f6ff',
+        color: isDark ? '#e6eef7' : '#05253f'
     };
     const inputBase = {
         padding: '12px 14px',
@@ -178,11 +236,12 @@ function DashboardPage() {
         background: isDark ? '#071727' : '#ffffff',
         color: isDark ? '#e6eef7' : '#05253f',
         fontSize: 14,
+        boxSizing: 'border-box',
         flex: 1
     };
     const page = {
         minHeight: '100vh',
-        background: isDark ? '#05070a' : 'linear-gradient(180deg,#e0f0ff,#f6faff)',
+        background: isDark ? '#05070a' : 'linear-gradient(180deg,#e7f3ff,#f9fbff)',
         color: isDark ? '#e6eef7' : '#05253f',
         fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial',
         padding: 18
@@ -191,7 +250,7 @@ function DashboardPage() {
         maxWidth: 1120,
         margin: '6px auto'
     };
-    const cardStyle = ()=>({
+    const cardStyle = (index)=>({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -199,7 +258,8 @@ function DashboardPage() {
             padding: '18px 20px',
             borderRadius: 10,
             border: "1px solid ".concat(borderColor),
-            boxShadow: isDark ? '0 6px 20px rgba(0,0,0,0.5)' : '0 4px 16px rgba(37,99,235,0.08)'
+            boxShadow: isDark ? '0 6px 20px rgba(0,0,0,0.5)' : '0 4px 16px rgba(37,99,235,0.08)',
+            transition: 'transform 160ms ease'
         });
     const pillButton = (bg, txt)=>({
             display: 'inline-flex',
@@ -214,6 +274,17 @@ function DashboardPage() {
             minWidth: 110,
             justifyContent: 'center'
         });
+    const menuStyle = {
+        position: 'absolute',
+        left: 0,
+        top: 'calc(100% + 8px)',
+        background: isDark ? '#071d2e' : '#fff',
+        border: "1px solid ".concat(borderColor),
+        borderRadius: 6,
+        boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
+        zIndex: 50,
+        minWidth: 160
+    };
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         style: page,
         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -234,7 +305,7 @@ function DashboardPage() {
                                     children: "Your Books"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 200,
+                                    lineNumber: 273,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -244,13 +315,13 @@ function DashboardPage() {
                                     children: "Dashboard To Get Hired"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 201,
+                                    lineNumber: 274,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 199,
+                            lineNumber: 272,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -261,38 +332,39 @@ function DashboardPage() {
                             children: [
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                     onClick: ()=>setTheme((t)=>t === 'dark' ? 'light' : 'dark'),
-                                    style: buttonBase,
+                                    style: buttonGhost,
                                     children: isDark ? 'Lite' : 'Dark'
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 204,
+                                    lineNumber: 277,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                     onClick: fetchBooks,
-                                    style: buttonBase,
+                                    style: buttonGhost,
                                     children: "Refresh"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 207,
+                                    lineNumber: 280,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 203,
+                            lineNumber: 276,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                    lineNumber: 198,
+                    lineNumber: 271,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                     style: {
                         display: 'flex',
                         gap: 8,
+                        marginTop: 12,
                         alignItems: 'center'
                     },
                     children: [
@@ -300,10 +372,13 @@ function DashboardPage() {
                             placeholder: "Search by title or author",
                             value: search,
                             onChange: (e)=>setSearch(e.target.value),
-                            style: inputBase
+                            style: {
+                                ...inputBase,
+                                flex: 1
+                            }
                         }, void 0, false, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 213,
+                            lineNumber: 286,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
@@ -319,7 +394,7 @@ function DashboardPage() {
                                     children: "All statuses"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 215,
+                                    lineNumber: 288,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -327,7 +402,7 @@ function DashboardPage() {
                                     children: "Wishlist"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 216,
+                                    lineNumber: 289,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -335,7 +410,7 @@ function DashboardPage() {
                                     children: "Reading"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 217,
+                                    lineNumber: 290,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -343,13 +418,13 @@ function DashboardPage() {
                                     children: "Completed"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 218,
+                                    lineNumber: 291,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 214,
+                            lineNumber: 287,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -361,22 +436,22 @@ function DashboardPage() {
                                     setSearch('');
                                     setFilterStatus('all');
                                 },
-                                style: buttonBase,
+                                style: buttonGhost,
                                 children: "Clear"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                lineNumber: 221,
+                                lineNumber: 294,
                                 columnNumber: 13
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 220,
+                            lineNumber: 293,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                    lineNumber: 212,
+                    lineNumber: 285,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -384,8 +459,8 @@ function DashboardPage() {
                     style: {
                         display: 'flex',
                         gap: 8,
-                        marginTop: 12,
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        marginTop: 12
                     },
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -395,7 +470,7 @@ function DashboardPage() {
                             style: inputBase
                         }, void 0, false, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 227,
+                            lineNumber: 300,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -404,19 +479,23 @@ function DashboardPage() {
                             onChange: (e)=>setAuthor(e.target.value),
                             style: {
                                 ...inputBase,
-                                width: 300
+                                width: 320
                             }
                         }, void 0, false, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 228,
+                            lineNumber: 301,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
                             value: addStatus,
                             onChange: (e)=>setAddStatus(e.target.value),
                             style: {
-                                ...inputBase,
-                                width: 140
+                                padding: '10px 14px',
+                                borderRadius: 6,
+                                border: '1px solid rgba(0,0,0,0.06)',
+                                background: statusMeta[addStatus].bg,
+                                color: statusMeta[addStatus].text,
+                                fontWeight: 800
                             },
                             children: [
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -424,7 +503,7 @@ function DashboardPage() {
                                     children: "Wishlist"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 230,
+                                    lineNumber: 303,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -432,7 +511,7 @@ function DashboardPage() {
                                     children: "Reading"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 231,
+                                    lineNumber: 304,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -440,13 +519,13 @@ function DashboardPage() {
                                     children: "Completed"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 232,
+                                    lineNumber: 305,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 229,
+                            lineNumber: 302,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -463,7 +542,7 @@ function DashboardPage() {
                                     children: saving ? 'Adding…' : 'Add'
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 236,
+                                    lineNumber: 309,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -472,71 +551,78 @@ function DashboardPage() {
                                         setTitle('');
                                         setAuthor('');
                                         setAddStatus('wishlist');
+                                        setError(null);
                                     },
-                                    style: buttonBase,
+                                    style: buttonGhost,
                                     children: "Clear"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 237,
+                                    lineNumber: 312,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 235,
+                            lineNumber: 308,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                    lineNumber: 226,
+                    lineNumber: 299,
                     columnNumber: 9
                 }, this),
                 error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                     style: {
-                        color: '#f87171',
+                        color: '#ff8080',
                         marginTop: 8
                     },
                     children: error
                 }, void 0, false, {
                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                    lineNumber: 241,
+                    lineNumber: 316,
                     columnNumber: 19
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                     style: {
                         display: 'grid',
                         gap: 14,
-                        marginTop: 20
+                        marginTop: 12
                     },
-                    children: loading ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                    children: loading ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         style: {
                             color: muted
                         },
                         children: "Loading…"
                     }, void 0, false, {
                         fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                        lineNumber: 246,
+                        lineNumber: 320,
                         columnNumber: 13
-                    }, this) : visible.length ? visible.map((b)=>{
+                    }, this) : visible.length ? visible.map((b, i)=>{
                         var _b_status;
                         const st = (_b_status = b.status) !== null && _b_status !== void 0 ? _b_status : 'wishlist';
-                        const meta = statusMeta[st];
+                        var _statusMeta_st;
+                        const meta = (_statusMeta_st = statusMeta[st]) !== null && _statusMeta_st !== void 0 ? _statusMeta_st : statusMeta.wishlist;
                         const isOpen = openMenuId === b.id;
+                        var _b_status1;
                         return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            style: cardStyle(),
+                            style: cardStyle(i),
                             children: [
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    style: {
+                                        maxWidth: '68%'
+                                    },
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             style: {
                                                 fontWeight: 800,
-                                                fontSize: 18
+                                                fontSize: 20,
+                                                marginBottom: 6
                                             },
                                             children: b.title
                                         }, void 0, false, {
                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                            lineNumber: 255,
+                                            lineNumber: 330,
                                             columnNumber: 21
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -546,30 +632,39 @@ function DashboardPage() {
                                             },
                                             children: [
                                                 b.author && "".concat(b.author, " • ") || '',
-                                                st
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                    style: {
+                                                        textTransform: 'capitalize'
+                                                    },
+                                                    children: (_b_status1 = b.status) !== null && _b_status1 !== void 0 ? _b_status1 : '—'
+                                                }, void 0, false, {
+                                                    fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
+                                                    lineNumber: 333,
+                                                    columnNumber: 23
+                                                }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                            lineNumber: 256,
+                                            lineNumber: 331,
                                             columnNumber: 21
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 254,
+                                    lineNumber: 329,
                                     columnNumber: 19
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                     style: {
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: 10,
-                                        position: 'relative'
+                                        gap: 12
                                     },
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             style: {
-                                                position: 'relative'
+                                                position: 'relative',
+                                                display: 'inline-block'
                                             },
                                             children: [
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -577,55 +672,115 @@ function DashboardPage() {
                                                         e.stopPropagation();
                                                         setOpenMenuId(isOpen ? null : b.id);
                                                     },
-                                                    style: pillButton(meta.bg, meta.text),
-                                                    children: st
-                                                }, void 0, false, {
+                                                    style: {
+                                                        ...pillButton(meta.bg, meta.text),
+                                                        background: isDark ? meta.bg : meta.bg,
+                                                        color: meta.text
+                                                    },
+                                                    children: [
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                            style: {
+                                                                width: 10,
+                                                                height: 10,
+                                                                borderRadius: 999,
+                                                                background: '#ffffff55',
+                                                                display: 'inline-block'
+                                                            }
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
+                                                            lineNumber: 347,
+                                                            columnNumber: 25
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                            style: {
+                                                                textTransform: 'capitalize'
+                                                            },
+                                                            children: st
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
+                                                            lineNumber: 348,
+                                                            columnNumber: 25
+                                                        }, this)
+                                                    ]
+                                                }, void 0, true, {
                                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                                    lineNumber: 264,
+                                                    lineNumber: 339,
                                                     columnNumber: 23
                                                 }, this),
                                                 isOpen && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                    style: {
-                                                        position: 'absolute',
-                                                        top: 'calc(100% + 8px)',
-                                                        left: 0,
-                                                        background: isDark ? '#071d2e' : '#fff',
-                                                        border: "1px solid ".concat(borderColor),
-                                                        borderRadius: 6,
-                                                        zIndex: 50
-                                                    },
-                                                    children: STATUS_ORDER.map((s)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    style: menuStyle,
+                                                    onClick: (e)=>e.stopPropagation(),
+                                                    children: STATUS_ORDER.map((s)=>{
+                                                        const m = statusMeta[s];
+                                                        const itemBg = s === st ? isDark ? '#0b2b3a' : '#f6fbff' : isDark ? '#06202e' : '#fff';
+                                                        const textColor = s === st ? m.text : isDark ? '#e6eef7' : '#07203a';
+                                                        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                            role: "button",
                                                             onClick: ()=>updateStatus(b.id, s),
                                                             style: {
-                                                                padding: '10px 14px',
+                                                                padding: '12px 14px',
                                                                 cursor: 'pointer',
-                                                                background: s === st ? meta.bg : isDark ? '#071d2e' : '#fff',
-                                                                color: s === st ? meta.text : isDark ? '#e6eef7' : '#05253f'
+                                                                background: itemBg,
+                                                                color: textColor,
+                                                                fontWeight: 800
                                                             },
-                                                            children: s
-                                                        }, s, false, {
+                                                            children: [
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                    style: {
+                                                                        width: 10,
+                                                                        height: 10,
+                                                                        borderRadius: 999,
+                                                                        background: m.bg,
+                                                                        display: 'inline-block',
+                                                                        marginRight: 10
+                                                                    }
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
+                                                                    lineNumber: 359,
+                                                                    columnNumber: 33
+                                                                }, this),
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                    style: {
+                                                                        textTransform: 'capitalize'
+                                                                    },
+                                                                    children: s
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
+                                                                    lineNumber: 360,
+                                                                    columnNumber: 33
+                                                                }, this)
+                                                            ]
+                                                        }, s, true, {
                                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                                            lineNumber: 287,
-                                                            columnNumber: 29
-                                                        }, this))
+                                                            lineNumber: 358,
+                                                            columnNumber: 31
+                                                        }, this);
+                                                    })
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                                    lineNumber: 275,
+                                                    lineNumber: 352,
                                                     columnNumber: 25
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                            lineNumber: 263,
+                                            lineNumber: 338,
                                             columnNumber: 21
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                             onClick: ()=>removeBook(b.id),
-                                            style: buttonPrimary,
+                                            style: {
+                                                padding: '10px 14px',
+                                                borderRadius: 6,
+                                                background: '#2563eb',
+                                                color: '#fff',
+                                                fontWeight: 700,
+                                                border: 'none'
+                                            },
                                             children: "Delete"
                                         }, void 0, false, {
                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                            lineNumber: 304,
+                                            lineNumber: 368,
                                             columnNumber: 21
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -633,48 +788,70 @@ function DashboardPage() {
                                                 color: muted,
                                                 fontSize: 12
                                             },
-                                            children: formatIsoTimestamp(b.created_at)
+                                            children: b.created_at ? formatIsoTimestamp(b.created_at) : ''
                                         }, void 0, false, {
                                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                            lineNumber: 305,
+                                            lineNumber: 370,
                                             columnNumber: 21
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                                    lineNumber: 262,
+                                    lineNumber: 337,
                                     columnNumber: 19
                                 }, this)
                             ]
                         }, b.id, true, {
                             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                            lineNumber: 253,
+                            lineNumber: 328,
                             columnNumber: 17
                         }, this);
-                    }) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                    }) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         style: {
                             color: muted
                         },
                         children: "No books yet — add one above."
                     }, void 0, false, {
                         fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                        lineNumber: 311,
+                        lineNumber: 376,
                         columnNumber: 13
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-                    lineNumber: 244,
+                    lineNumber: 318,
+                    columnNumber: 9
+                }, this),
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    style: {
+                        marginTop: 12,
+                        color: muted,
+                        fontSize: 13
+                    },
+                    children: [
+                        'Tip: click a colored pill to open the menu. If you see "Unauthorized" in console, ensure SUPABASE keys are set in ',
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$Book__Tracking$2f$book$2d$tracker$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("code", {
+                            children: ".env.local"
+                        }, void 0, false, {
+                            fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
+                            lineNumber: 381,
+                            columnNumber: 125
+                        }, this),
+                        "."
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
+                    lineNumber: 380,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-            lineNumber: 197,
+            lineNumber: 270,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/Desktop/Book Tracking/book-tracker/src/app/dashboard/page.tsx",
-        lineNumber: 196,
+        lineNumber: 269,
         columnNumber: 5
     }, this);
 }
