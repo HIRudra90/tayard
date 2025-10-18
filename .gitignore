@@ -1,13 +1,2 @@
-﻿# Node / build artifacts
-node_modules/
-.next/
-dist/
-
-# env files (do NOT commit secrets)
-.env
+﻿node_modules/
 .env.local
-.env.*.local
-
-# OS / editor
-.DS_Store
-.vscode/
