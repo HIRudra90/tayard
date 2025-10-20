@@ -1,23 +1,29 @@
 globalThis.__BUILD_MANIFEST = {
   "pages": {
-    "/_app": []
+    "/_app": [
+      "static/chunks/1906d8f6db4cf00c.js",
+      "static/chunks/1cc2fafb60dfe778.js",
+      "static/chunks/turbopack-82d466beab77bbaf.js"
+    ],
+    "/_error": [
+      "static/chunks/c09ada2f4c0acad8.js",
+      "static/chunks/1cc2fafb60dfe778.js",
+      "static/chunks/turbopack-9d2195d3846109b6.js"
+    ]
   },
   "devFiles": [],
   "ampDevFiles": [],
   "polyfillFiles": [
-    "static/chunks/4cd2d_next_dist_build_polyfills_polyfill-nomodule.js"
+    "static/chunks/a6dad97d9634a72d.js"
   ],
   "lowPriorityFiles": [],
   "rootMainFiles": [
-    "static/chunks/[turbopack]_browser_dev_hmr-client_hmr-client_ts_41283076._.js",
-    "static/chunks/4cd2d_next_dist_compiled_react-dom_e7435747._.js",
-    "static/chunks/4cd2d_next_dist_compiled_next-devtools_index_411814c3.js",
-    "static/chunks/4cd2d_next_dist_compiled_8bb88cf0._.js",
-    "static/chunks/4cd2d_next_dist_client_a034b283._.js",
-    "static/chunks/4cd2d_next_dist_cd0dcc35._.js",
-    "static/chunks/4cd2d_@swc_helpers_cjs_2a6337f8._.js",
-    "static/chunks/Desktop_Book Tracking_book-tracker_a0ff3932._.js",
-    "static/chunks/turbopack-Desktop_Book Tracking_book-tracker_c7c988c4._.js"
+    "static/chunks/bdcf84f6adf04d30.js",
+    "static/chunks/87d0533659159815.js",
+    "static/chunks/65dd6dfef558784d.js",
+    "static/chunks/c4b58c2f1221918c.js",
+    "static/chunks/c95554c4f5135229.js",
+    "static/chunks/turbopack-112e1bfcded2b046.js"
   ],
   "ampFirstPages": []
 };

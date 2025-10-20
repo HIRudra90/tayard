@@ -1,32 +1,3 @@
-module.exports = [
-"[project]/Desktop/Book Tracking/book-tracker/node_modules/next/dist/client/components/builtin/unauthorized.js [app-rsc] (ecmascript)", ((__turbopack_context__, module, exports) => {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
-Object.defineProperty(exports, "default", {
-    enumerable: true,
-    get: function() {
-        return Unauthorized;
-    }
-});
-const _jsxruntime = __turbopack_context__.r("[project]/Desktop/Book Tracking/book-tracker/node_modules/next/dist/server/route-modules/app-page/vendored/rsc/react-jsx-runtime.js [app-rsc] (ecmascript)");
-const _errorfallback = __turbopack_context__.r("[project]/Desktop/Book Tracking/book-tracker/node_modules/next/dist/client/components/http-access-fallback/error-fallback.js [app-rsc] (ecmascript)");
-function Unauthorized() {
-    return /*#__PURE__*/ (0, _jsxruntime.jsx)(_errorfallback.HTTPAccessErrorFallback, {
-        status: 401,
-        message: "You're not authorized to access this page."
-    });
-}
-if ((typeof exports.default === 'function' || typeof exports.default === 'object' && exports.default !== null) && typeof exports.default.__esModule === 'undefined') {
-    Object.defineProperty(exports.default, '__esModule', {
-        value: true
-    });
-    Object.assign(exports.default, exports);
-    module.exports = exports.default;
-} //# sourceMappingURL=unauthorized.js.map
-}),
-];
+module.exports=[96975,(a,b,c)=>{"use strict";Object.defineProperty(c,"__esModule",{value:!0}),Object.defineProperty(c,"default",{enumerable:!0,get:function(){return f}});let d=a.r(57915),e=a.r(74262);function f(){return(0,d.jsx)(e.HTTPAccessErrorFallback,{status:401,message:"You're not authorized to access this page."})}("function"==typeof c.default||"object"==typeof c.default&&null!==c.default)&&void 0===c.default.__esModule&&(Object.defineProperty(c.default,"__esModule",{value:!0}),Object.assign(c.default,c),b.exports=c.default)}];
 
 //# sourceMappingURL=4cd2d_next_dist_client_components_builtin_unauthorized_56c0dd4a.js.map

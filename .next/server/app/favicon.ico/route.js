@@ -1,6 +1,7 @@
 var R=require("../../chunks/[turbopack]_runtime.js")("server/app/favicon.ico/route.js")
-R.c("server/chunks/4cd2d_next_93a73643._.js")
-R.c("server/chunks/[root-of-the-server]__b2d1cbe1._.js")
-R.m("[project]/Desktop/Book Tracking/book-tracker/.next-internal/server/app/favicon.ico/route/actions.js [app-rsc] (server actions loader, ecmascript)")
-R.m("[project]/Desktop/Book Tracking/book-tracker/node_modules/next/dist/esm/build/templates/app-route.js { INNER_APP_ROUTE => \"[project]/Desktop/Book Tracking/book-tracker/src/app/favicon--route-entry.js [app-route] (ecmascript)\" } [app-route] (ecmascript)")
-module.exports=R.m("[project]/Desktop/Book Tracking/book-tracker/node_modules/next/dist/esm/build/templates/app-route.js { INNER_APP_ROUTE => \"[project]/Desktop/Book Tracking/book-tracker/src/app/favicon--route-entry.js [app-route] (ecmascript)\" } [app-route] (ecmascript)").exports
+R.c("server/chunks/[root-of-the-server]__64ae897e._.js")
+R.c("server/chunks/[root-of-the-server]__cbc93a4c._.js")
+R.c("server/chunks/4cd2d_next_dist_esm_build_templates_app-route_d7198fb1.js")
+R.m(33293)
+R.m(8593)
+module.exports=R.m(8593).exports
