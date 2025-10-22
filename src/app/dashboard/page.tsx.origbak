@@ -1,0 +1,76 @@
+﻿"use client";
+
+import React, { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      if (!data.session) {
+        router.replace("/");
+        return;
+      }
+      setSession(data.session);
+      setLoading(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (!s) {
+        router.replace("/");
+      } else {
+        setSession(s);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      if (listener && listener.subscription) listener.subscription.unsubscribe();
+    };
+  }, [router]);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.replace("/");
+  };
+
+  if (loading) {
+    return (
+      <div style={{ padding: 24, minHeight: "100vh", background: "#f8fafc", color: "#0b1220" }}>
+        Checking session
+      </div>
+    );
+  }
+
+  return (
+    <main style={{ minHeight: "100vh", background: "#f8fafc", color: "#0b1220", fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial" }}>
+      <div style={{ maxWidth: 1100, margin: "48px auto", padding: 24 }}>
+        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h1 style={{ margin: 0, fontSize: 28 }}>Dashboard</h1>
+          <div>
+            <button onClick={handleSignOut} style={{ padding: "8px 12px", borderRadius: 8, background: "#111827", color: "#fff", border: "none" }}>
+              Sign out
+            </button>
+          </div>
+        </header>
+
+        <section style={{ marginTop: 28, background: "#fff", padding: 20, borderRadius: 12, boxShadow: "0 8px 24px rgba(10,20,30,0.06)" }}>
+          <p style={{ margin: 0, fontSize: 18, color: "#0b1220" }}>
+            Welcome, <strong>{session?.user?.email}</strong>
+          </p>
+
+          <div style={{ marginTop: 18 }}>
+            <p style={{ margin: 0 }}>This is your dashboard. Add your components here (reading list, stats, etc.).</p>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}

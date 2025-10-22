@@ -1,72 +1,140 @@
-﻿import Link from "next/link";
+﻿"use client";
 
-export const metadata = {
-  title: "Book Tracker Home",
-  description: "Dashboard To Get Hired — Book Tracking App",
-};
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
-export default function Home() {
+export default function HomePage() {
+  const [sessionInfo, setSessionInfo] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSessionInfo(data.session ?? null);
+      if (data.session) router.push("/dashboard");
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSessionInfo(session ?? null);
+      if (session) router.push("/dashboard");
+    });
+
+    return () => {
+      if (listener && listener.subscription) listener.subscription.unsubscribe();
+    };
+  }, [router]);
+
+  const handleSignInWithGoogle = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const redirectTo =
+        (process.env.NEXT_PUBLIC_REDIRECT_URL ?? window.location.origin) + "/dashboard";
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo },
+      });
+      if (error) throw error;
+    } catch (err) {
+      setError(err?.message ?? String(err));
+      setLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setSessionInfo(null);
+  };
+
   return (
-    <main
-      style={{
-        fontFamily: "Inter, system-ui, sans-serif",
-        minHeight: "100vh",
-        background: "linear-gradient(180deg, #dbeafe 0%, #f1f5f9 100%)",
-        color: "#0f172a",
-        padding: "60px 20px",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "700px",
-          margin: "0 auto",
-          textAlign: "center",
-          background: "#ffffff",
-          padding: "40px",
-          borderRadius: "16px",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-        }}
-      >
-        <h1 style={{ fontSize: "2.5rem", fontWeight: 800, marginBottom: "10px" }}>
-          Welcome to <span style={{ color: "#2563eb" }}>Book Tracker</span>
-        </h1>
-        <p style={{ fontSize: "1.1rem", color: "#334155", marginBottom: "24px" }}>
-          Dashboard To Get Hired — Track, Add, and Manage Your Reading Journey.
+    <main style={{
+      minHeight: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "linear-gradient(180deg,#060606 0%, #0b0b0b 100%)",
+      fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial"
+    }}>
+      <div style={{
+        width: "min(680px, 92vw)",
+        background: "#0f1720",
+        color: "#fff",
+        borderRadius: 16,
+        padding: 36,
+        boxShadow: "0 12px 40px rgba(2,6,23,0.7)",
+        textAlign: "center"
+      }}>
+        <h1 style={{ margin: 0, fontSize: 36, fontWeight: 800 }}>Welcome back</h1>
+        <p style={{ marginTop: 12, color: "#cbd5e1", fontSize: 16 }}>
+          Sign in with your Google account to continue to Book Tracker.
         </p>
 
-        <div style={{ display: "flex", justifyContent: "center", gap: "12px" }}>
-          <Link
-            href="/dashboard"
-            style={{
-              padding: "12px 24px",
-              background: "#2563eb",
-              color: "white",
-              borderRadius: "8px",
-              fontWeight: 600,
-              textDecoration: "none",
-              transition: "all 0.3s ease",
-            }}
-          >
-            Go to Dashboard
-          </Link>
+        {sessionInfo ? (
+          <div style={{ marginTop: 20 }}>
+            <p style={{ color: "#e6eef8", marginBottom: 8 }}>
+              Signed in as <strong>{sessionInfo?.user?.email}</strong>
+            </p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+              <button
+                onClick={() => router.push("/dashboard")}
+                style={{
+                  background: "#2563eb",
+                  color: "#fff",
+                  padding: "10px 18px",
+                  borderRadius: 10,
+                  border: "none",
+                  cursor: "pointer",
+                  fontWeight: 700
+                }}
+              >
+                Go to Dashboard
+              </button>
+              <button
+                onClick={handleSignOut}
+                style={{
+                  background: "transparent",
+                  color: "#cbd5e1",
+                  padding: "10px 18px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(203,213,225,0.12)",
+                  cursor: "pointer",
+                  fontWeight: 600
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginTop: 24 }}>
+            <button
+              onClick={handleSignInWithGoogle}
+              disabled={loading}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 10,
+                background: "#fff",
+                color: "#111",
+                padding: "12px 18px",
+                borderRadius: 12,
+                border: "none",
+                cursor: "pointer",
+                fontWeight: 700,
+                fontSize: 16,
+                boxShadow: "0 8px 24px rgba(2,6,23,0.5)"
+              }}
+            >
+              {loading ? "Opening" : "Sign in with Google"}
+            </button>
 
-          <a
-            href="https://vercel.com"
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              padding: "12px 24px",
-              border: "2px solid #2563eb",
-              color: "#2563eb",
-              borderRadius: "8px",
-              fontWeight: 600,
-              textDecoration: "none",
-              transition: "all 0.3s ease",
-            }}
-          >
-            Deploy on Vercel
-          </a>
-        </div>
+            {error && <div style={{ color: "#ff7b7b", marginTop: 12 }}>{error}</div>}
+          </div>
+        )}
+
+        <div style={{ marginTop: 22, fontSize: 13, color: "#94a3b8" }}> Book Tracker</div>
       </div>
     </main>
   );

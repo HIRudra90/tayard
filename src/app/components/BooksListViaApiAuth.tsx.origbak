@@ -1,4 +1,6 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo, useContext } from 'react';
+﻿// src/app/components/BooksListViaApiAuth.tsx
+import React, { useEffect, useState } from "react";
+
 type Book = {
   id: string;
   title: string;
@@ -7,7 +9,7 @@ type Book = {
   created_at?: string | null;
 };
 
-export default function BooksListViaApiAuth(): React.ReactElement {
+export default function BooksListViaApiAuth(): JSX.Element {
   const [books, setBooks] = useState<Book[] | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export default function BooksListViaApiAuth(): React.ReactElement {
           throw new Error(txt || `Server ${res.status}`);
         }
         const data = await res.json();
-        const arr: Book[] = Array.isArray(data) ? data : Array.isArray(data?.books) ? data.books : [];
+        const arr: Book[] = Array.isArray(data) ? data : Array.isArray((data as any)?.books) ? (data as any).books : [];
         if (mounted) setBooks(arr);
       } catch (err: unknown) {
         if (mounted) setError(String(err));
@@ -54,5 +56,3 @@ export default function BooksListViaApiAuth(): React.ReactElement {
     </div>
   );
 }
-
-
