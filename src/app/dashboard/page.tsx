@@ -18,7 +18,15 @@ const STATUS_ORDER: Array<"wishlist" | "reading" | "completed"> = ["wishlist", "
 
 function formatIsoTimestamp(iso?: string | null) {
   if (!iso) return "";
-  return iso.replace("T", " ").split(".")[0];
+  // Convert ISO -> Date and render in the user's local timezone
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 // --- type guards (removes any) ---
