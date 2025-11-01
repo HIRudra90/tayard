@@ -31,20 +31,20 @@ export default function HomePage() {
       if (error) console.warn("getSession error:", error.message);
       const session = data?.session ?? null;
       setSessionInfo(session);
-      if (session && !navigating.current) {
-        navigating.current = true;
-        router.push("/dashboard");
-      }
+      // if (session && !navigating.current) {
+      //   navigating.current = true;
+      //   router.push("/dashboard");
+      // }
     });
 
     // Listen for auth changes
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
       setSessionInfo(session ?? null);
-      if (session && !navigating.current) {
-        navigating.current = true;
-        router.push("/dashboard");
-      }
+      // if (session && !navigating.current) {
+      //   navigating.current = true;
+      //   router.push("/dashboard");
+      // }
     });
 
     return () => {
