@@ -2,6 +2,8 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 
 type Book = {
@@ -19,7 +21,7 @@ function formatIsoTimestamp(iso?: string | null) {
   return iso.replace("T", " ").split(".")[0];
 }
 
-// --- type guards ---
+// --- type guards (removes any) ---
 function isBook(obj: unknown): obj is Book {
   if (typeof obj !== "object" || obj === null) return false;
   const o = obj as Record<string, unknown>;
@@ -37,14 +39,14 @@ function getBooksFromUnknown(data: unknown): Book[] {
   return [];
 }
 
-// helper: get Authorization header with access_token
-async function getAuthHeader(): Promise<HeadersInit> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 export default function DashboardPage() {
+  const router = useRouter();
+
+  // --- auth state (for auto-redirect + logout) ---
+  const [session, setSession] = useState<Session | null>(null);
+  const [booted, setBooted] = useState(false);
+
+  // --- app state ---
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -57,6 +59,7 @@ export default function DashboardPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // default server-safe theme; loaded from localStorage on client
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   const statusMeta: Record<"wishlist" | "reading" | "completed", { bg: string; text: string }> = {
@@ -66,16 +69,53 @@ export default function DashboardPage() {
   };
 
   function logUnknownError(e: unknown, prefix = "") {
-    if (e instanceof Error) console.error(prefix, e.message, e);
-    else console.error(prefix, e);
+    if (e instanceof Error) {
+      console.error(prefix, e.message, e);
+    } else {
+      console.error(prefix, e);
+    }
   }
+
+  // --- auth guard + listener ---
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return;
+      if (error) console.warn("getSession error:", error.message);
+      const s = data?.session ?? null;
+      setSession(s);
+      setBooted(true);
+      if (!s) router.replace("/"); // protect dashboard
+    });
+
+    const { data } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (!mounted) return;
+      setSession(s ?? null);
+      if (!s) router.replace("/");
+    });
+
+    return () => {
+      mounted = false;
+      data.subscription.unsubscribe();
+    };
+  }, [router]);
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      setSession(null);
+      router.replace("/");
+    } catch (e) {
+      console.error("signOut error:", e);
+    }
+  };
 
   const fetchBooks = async (): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
-      const headers = await getAuthHeader();
-      const res = await fetch("/api/books", { headers, cache: "no-store" });
+      const res = await fetch("/api/books", { cache: "no-store" });
       if (!res.ok) {
         const txt = await res.text().catch(() => "Failed to read error body");
         throw new Error(txt || `Server responded ${res.status}`);
@@ -94,9 +134,11 @@ export default function DashboardPage() {
     try {
       const stored = localStorage.getItem("booktracker_theme") as "dark" | "light" | null;
       if (stored && (stored === "dark" || stored === "light")) setTheme(stored);
-    } catch {}
-    fetchBooks();
+    } catch {
+      // ignore localStorage errors
+    }
 
+    fetchBooks();
     const clickHandler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpenMenuId(null);
@@ -104,30 +146,39 @@ export default function DashboardPage() {
     };
     document.addEventListener("click", clickHandler);
     return () => document.removeEventListener("click", clickHandler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    try { localStorage.setItem("booktracker_theme", theme); } catch {}
+    try {
+      localStorage.setItem("booktracker_theme", theme);
+    } catch {
+      // ignore
+    }
   }, [theme]);
 
   const onAdd = async (e?: React.FormEvent) => {
     e?.preventDefault();
     setError(null);
     const t = title.trim();
-    if (!t) { setError("Title required"); return; }
+    if (!t) {
+      setError("Title required");
+      return;
+    }
     setSaving(true);
     try {
-      const headers = { ...(await getAuthHeader()), "Content-Type": "application/json" };
       const res = await fetch("/api/books", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: t, author: author.trim() || null, status: addStatus }),
       });
       if (!res.ok) {
         const txt = await res.text().catch(() => "server error");
         throw new Error(txt || `Server ${res.status}`);
       }
-      setTitle(""); setAuthor(""); setAddStatus("wishlist");
+      setTitle("");
+      setAuthor("");
+      setAddStatus("wishlist");
       await fetchBooks();
     } catch (e: unknown) {
       logUnknownError(e, "onAdd error:");
@@ -138,15 +189,22 @@ export default function DashboardPage() {
   };
 
   const updateStatus = async (id: string, newStatus: "wishlist" | "reading" | "completed") => {
-    if (!id) { setError("Cannot update: missing id"); return; }
+    if (!id) {
+      console.error("updateStatus: missing id (not sending request)");
+      setError("Cannot update: missing id");
+      return;
+    }
+
     const prev = books;
-    setBooks(prev => prev.map(b => (b.id === id ? { ...b, status: newStatus } : b)));
+    setBooks((p) => p.map((b) => (b.id === id ? { ...b, status: newStatus } : b)));
     setOpenMenuId(null);
+
     try {
-      const headers = { ...(await getAuthHeader()), "Content-Type": "application/json" };
-      const res = await fetch(`/api/books/${id}`, {
+      const url = `/api/books/${id}`;
+      console.log("PATCH", url);
+      const res = await fetch(url, {
         method: "PATCH",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
         cache: "no-store",
       });
@@ -157,18 +215,25 @@ export default function DashboardPage() {
     } catch (e) {
       logUnknownError(e, "updateStatus error:");
       setError("Failed to update status (see console).");
-      setBooks(prev);
+      setBooks(prev); // rollback
     }
   };
 
   const removeBook = async (id: string) => {
-    if (!id) { setError("Cannot delete: missing id"); return; }
+    if (!id) {
+      console.error("removeBook: missing id (not sending request)");
+      setError("Cannot delete: missing id");
+      return;
+    }
     if (!confirm("Delete this book?")) return;
+
     const prev = books;
-    setBooks(p => p.filter(b => b.id !== id));
+    setBooks((p) => p.filter((b) => b.id !== id));
+
     try {
-      const headers = await getAuthHeader();
-      const res = await fetch(`/api/books/${id}`, { method: "DELETE", headers, cache: "no-store" });
+      const url = `/api/books/${id}`;
+      console.log("DELETE", url);
+      const res = await fetch(url, { method: "DELETE", cache: "no-store" });
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
         throw new Error(txt || `Server ${res.status}`);
@@ -176,7 +241,7 @@ export default function DashboardPage() {
     } catch (e) {
       logUnknownError(e, "removeBook error:");
       setError("Delete failed (see console).");
-      setBooks(prev);
+      setBooks(prev); // rollback
     }
   };
 
@@ -188,7 +253,7 @@ export default function DashboardPage() {
       return (b.title ?? "").toLowerCase().includes(q) || (b.author ?? "").toLowerCase().includes(q);
     });
 
-  // --- styles (unchanged from your version) ---
+  // ----- styling (kept same as previous) -----
   const isDark = theme === "dark";
   const borderColor = isDark ? "rgba(255,255,255,0.25)" : "rgba(30,58,138,0.25)";
   const muted = isDark ? "#9aa7b6" : "#4b5563";
@@ -205,38 +270,87 @@ export default function DashboardPage() {
     alignItems: "center",
     justifyContent: "center",
   };
+
   const buttonPrimary: React.CSSProperties = {
-    ...buttonBase, background: buttonBlue, color: "#fff",
+    ...buttonBase,
+    background: buttonBlue,
+    color: "#fff",
     boxShadow: isDark ? "0 4px 10px rgba(79,155,255,0.14)" : "0 4px 14px rgba(37,99,235,0.18)",
   };
+
   const buttonGhost: React.CSSProperties = {
-    ...buttonBase, background: isDark ? "#0b1a29" : "#f2f6ff", color: isDark ? "#e6eef7" : "#05253f",
+    ...buttonBase,
+    background: isDark ? "#0b1a29" : "#f2f6ff",
+    color: isDark ? "#e6eef7" : "#05253f",
   };
+
   const inputBase: React.CSSProperties = {
-    padding: "12px 14px", borderRadius: 6, border: `1px solid ${borderColor}`,
-    background: isDark ? "#071727" : "#ffffff", color: isDark ? "#e6eef7" : "#05253f",
-    fontSize: 14, boxSizing: "border-box", flex: 1,
+    padding: "12px 14px",
+    borderRadius: 6,
+    border: `1px solid ${borderColor}`,
+    background: isDark ? "#071727" : "#ffffff",
+    color: isDark ? "#e6eef7" : "#05253f",
+    fontSize: 14,
+    boxSizing: "border-box",
+    flex: 1,
   };
+
   const page: React.CSSProperties = {
-    minHeight: "100vh", background: isDark ? "#05070a" : "linear-gradient(180deg,#e7f3ff,#f9fbff)",
-    color: isDark ? "#e6eef7" : "#05253f", fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial',
+    minHeight: "100vh",
+    background: isDark ? "#05070a" : "linear-gradient(180deg,#e7f3ff,#f9fbff)",
+    color: isDark ? "#e6eef7" : "#05253f",
+    fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial',
     padding: 18,
   };
+
   const wrapper: React.CSSProperties = { maxWidth: 1120, margin: "6px auto" };
+
   const cardStyle = (_index: number): React.CSSProperties => ({
-    display: "flex", justifyContent: "space-between", alignItems: "center",
-    background: isDark ? "#0b2540" : "#ffffff", padding: "18px 20px", borderRadius: 10,
-    border: `1px solid ${borderColor}`, boxShadow: isDark ? "0 6px 20px rgba(0,0,0,0.5)" : "0 4px 16px rgba(37,99,235,0.08)",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    background: isDark ? "#0b2540" : "#ffffff",
+    padding: "18px 20px",
+    borderRadius: 10,
+    border: `1px solid ${borderColor}`,
+    boxShadow: isDark ? "0 6px 20px rgba(0,0,0,0.5)" : "0 4px 16px rgba(37,99,235,0.08)",
     transition: "transform 160ms ease",
   });
+
   const pillButton = (bg: string, txt: string): React.CSSProperties => ({
-    display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 6,
-    background: bg, color: txt, fontWeight: 800, cursor: "pointer", minWidth: 110, justifyContent: "center",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "8px 14px",
+    borderRadius: 6,
+    background: bg,
+    color: txt,
+    fontWeight: 800,
+    cursor: "pointer",
+    minWidth: 110,
+    justifyContent: "center",
   });
+
   const menuStyle: React.CSSProperties = {
-    position: "absolute", left: 0, top: "calc(100% + 8px)", background: isDark ? "#071d2e" : "#fff",
-    border: `1px solid ${borderColor}`, borderRadius: 6, boxShadow: "0 6px 20px rgba(0,0,0,0.25)", zIndex: 50, minWidth: 160,
+    position: "absolute",
+    left: 0,
+    top: "calc(100% + 8px)",
+    background: isDark ? "#071d2e" : "#fff",
+    border: `1px solid ${borderColor}`,
+    borderRadius: 6,
+    boxShadow: "0 6px 20px rgba(0,0,0,0.25)",
+    zIndex: 50,
+    minWidth: 160,
   };
+
+  // Splash while checking auth
+  if (!booted) {
+    return (
+      <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#0b0b0b", color: "#fff" }}>
+        <div>Loading…</div>
+      </main>
+    );
+  }
 
   return (
     <div style={page}>
@@ -247,24 +361,46 @@ export default function DashboardPage() {
             <p style={{ color: muted }}>Dashboard To Get Hired</p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => setTheme(t => (t === "dark" ? "light" : "dark"))} style={buttonGhost}>
+            <button onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} style={buttonGhost}>
               {isDark ? "Lite" : "Dark"}
             </button>
-            <button onClick={fetchBooks} style={buttonGhost}>Refresh</button>
+            <button onClick={fetchBooks} style={buttonGhost}>
+              Refresh
+            </button>
+            <button onClick={handleSignOut} style={buttonGhost} title={session?.user?.email ?? "Log out"}>
+              Log out
+            </button>
           </div>
         </div>
 
         {/* Search Row */}
         <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
-          <input placeholder="Search by title or author" value={search} onChange={(e) => setSearch(e.target.value)} style={{ ...inputBase, flex: 1 }} />
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as "all" | "wishlist" | "reading" | "completed")} style={{ ...inputBase, width: 160 }}>
+          <input
+            placeholder="Search by title or author"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ ...inputBase, flex: 1 }}
+          />
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as "all" | "wishlist" | "reading" | "completed")}
+            style={{ ...inputBase, width: 160 }}
+          >
             <option value="all">All statuses</option>
             <option value="wishlist">Wishlist</option>
             <option value="reading">Reading</option>
             <option value="completed">Completed</option>
           </select>
           <div style={{ marginLeft: "auto" }}>
-            <button onClick={() => { setSearch(""); setFilterStatus("all"); }} style={buttonGhost}>Clear</button>
+            <button
+              onClick={() => {
+                setSearch("");
+                setFilterStatus("all");
+              }}
+              style={buttonGhost}
+            >
+              Clear
+            </button>
           </div>
         </div>
 
@@ -272,15 +408,39 @@ export default function DashboardPage() {
         <form onSubmit={onAdd} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
           <input placeholder="Title (required)" value={title} onChange={(e) => setTitle(e.target.value)} style={inputBase} />
           <input placeholder="Author (optional)" value={author} onChange={(e) => setAuthor(e.target.value)} style={{ ...inputBase, width: 320 }} />
-          <select value={addStatus} onChange={(e) => setAddStatus(e.target.value as "wishlist" | "reading" | "completed")}
-            style={{ padding: "10px 14px", borderRadius: 6, border: "1px solid rgba(0,0,0,0.06)", background: statusMeta[addStatus].bg, color: statusMeta[addStatus].text, fontWeight: 800 }}>
+          <select
+            value={addStatus}
+            onChange={(e) => setAddStatus(e.target.value as "wishlist" | "reading" | "completed")}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 6,
+              border: "1px solid rgba(0,0,0,0.06)",
+              background: statusMeta[addStatus].bg,
+              color: statusMeta[addStatus].text,
+              fontWeight: 800,
+            }}
+          >
             <option value="wishlist">Wishlist</option>
             <option value="reading">Reading</option>
             <option value="completed">Completed</option>
           </select>
+
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-            <button type="submit" disabled={saving} style={buttonPrimary}>{saving ? "Adding…" : "Add"}</button>
-            <button type="button" onClick={() => { setTitle(""); setAuthor(""); setAddStatus("wishlist"); setError(null); }} style={buttonGhost}>Clear</button>
+            <button type="submit" disabled={saving} style={buttonPrimary}>
+              {saving ? "Adding…" : "Add"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTitle("");
+                setAuthor("");
+                setAddStatus("wishlist");
+                setError(null);
+              }}
+              style={buttonGhost}
+            >
+              Clear
+            </button>
           </div>
         </form>
 
@@ -307,23 +467,58 @@ export default function DashboardPage() {
 
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{ position: "relative", display: "inline-block" }}>
-                      <div onClick={(e) => { e.stopPropagation(); setOpenMenuId(isOpen ? null : b.id); }}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 6, background: meta.bg, color: meta.text, fontWeight: 800, cursor: "pointer", minWidth: 110, justifyContent: "center" }}>
-                        <span style={{ width: 10, height: 10, borderRadius: 999, background: "#ffffff55", display: "inline-block" }} />
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(isOpen ? null : b.id);
+                        }}
+                        style={{
+                          ...pillButton(meta.bg, meta.text),
+                          background: isDark ? meta.bg : meta.bg,
+                          color: meta.text,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: 999,
+                            background: "#ffffff55",
+                            display: "inline-block",
+                          }}
+                        />
                         <span style={{ textTransform: "capitalize" }}>{st}</span>
                       </div>
 
                       {isOpen && (
-                        <div style={{ position: "absolute", left: 0, top: "calc(100% + 8px)", background: isDark ? "#071d2e" : "#fff", border: `1px solid ${borderColor}`, borderRadius: 6, boxShadow: "0 6px 20px rgba(0,0,0,0.25)", zIndex: 50, minWidth: 160 }}
-                             onClick={(e) => e.stopPropagation()}>
+                        <div style={menuStyle} onClick={(e) => e.stopPropagation()}>
                           {STATUS_ORDER.map((s) => {
                             const m = statusMeta[s];
                             const itemBg = s === st ? (isDark ? "#0b2b3a" : "#f6fbff") : isDark ? "#06202e" : "#fff";
                             const textColor = s === st ? m.text : isDark ? "#e6eef7" : "#07203a";
                             return (
-                              <div key={s} role="button" onClick={() => updateStatus(b.id, s)}
-                                   style={{ padding: "12px 14px", cursor: "pointer", background: itemBg, color: textColor, fontWeight: 800 }}>
-                                <span style={{ width: 10, height: 10, borderRadius: 999, background: m.bg, display: "inline-block", marginRight: 10 }} />
+                              <div
+                                key={s}
+                                role="button"
+                                onClick={() => updateStatus(b.id, s)}
+                                style={{
+                                  padding: "12px 14px",
+                                  cursor: "pointer",
+                                  background: itemBg,
+                                  color: textColor,
+                                  fontWeight: 800,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: 10,
+                                    height: 10,
+                                    borderRadius: 999,
+                                    background: m.bg,
+                                    display: "inline-block",
+                                    marginRight: 10,
+                                  }}
+                                />
                                 <span style={{ textTransform: "capitalize" }}>{s}</span>
                               </div>
                             );
@@ -332,7 +527,17 @@ export default function DashboardPage() {
                       )}
                     </div>
 
-                    <button onClick={() => removeBook(b.id)} style={{ padding: "10px 14px", borderRadius: 6, background: "#2563eb", color: "#fff", fontWeight: 700, border: "none" }}>
+                    <button
+                      onClick={() => removeBook(b.id)}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 6,
+                        background: "#2563eb",
+                        color: "#fff",
+                        fontWeight: 700,
+                        border: "none",
+                      }}
+                    >
                       Delete
                     </button>
 
@@ -349,7 +554,8 @@ export default function DashboardPage() {
         </div>
 
         <div style={{ marginTop: 12, color: muted, fontSize: 13 }}>
-          Tip: if you see “Unauthorized”, ensure you’re signed in and env vars are correct.
+          Tip: click a colored pill to open the menu. If you see &quot;Unauthorized&quot; in console, ensure SUPABASE
+          keys are set in <code>.env.local</code>.
         </div>
       </div>
     </div>
