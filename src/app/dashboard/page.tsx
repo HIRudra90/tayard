@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { supabase } from "@/lib/supabaseClient"; // ✅ add this to read the access token
 
 type Book = {
   id: string;
@@ -47,6 +48,7 @@ export default function DashboardPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null); // ✅ store access token
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // default server-safe theme; loaded from localStorage on client
@@ -66,11 +68,21 @@ export default function DashboardPage() {
     }
   }
 
+  // Helper to include auth header when we have a token
+  const authHeaders = (extra?: HeadersInit): HeadersInit =>
+    token
+      ? { Authorization: `Bearer ${token}`, ...(extra || {}) }
+      : (extra || {});
+
   const fetchBooks = async (): Promise<void> => {
+    if (!token) {
+      // no token yet; wait for auth initialization
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/books");
+      const res = await fetch("/api/books", { headers: authHeaders() }); // ✅ send token
       if (!res.ok) {
         const txt = await res.text().catch(() => "Failed to read error body");
         throw new Error(txt || `Server responded ${res.status}`);
@@ -85,6 +97,32 @@ export default function DashboardPage() {
     }
   };
 
+  // Get token on mount and watch auth state
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setToken(data.session?.access_token ?? null);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      setToken(session?.access_token ?? null);
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Fetch once we have a token
+  useEffect(() => {
+    if (token) fetchBooks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem("booktracker_theme") as "dark" | "light" | null;
@@ -93,7 +131,6 @@ export default function DashboardPage() {
       // ignore localStorage errors
     }
 
-    fetchBooks();
     const clickHandler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpenMenuId(null);
@@ -101,7 +138,6 @@ export default function DashboardPage() {
     };
     document.addEventListener("click", clickHandler);
     return () => document.removeEventListener("click", clickHandler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -120,11 +156,15 @@ export default function DashboardPage() {
       setError("Title required");
       return;
     }
+    if (!token) {
+      setError("Not signed in");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/books", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders({ "Content-Type": "application/json" }), // ✅ send token
         body: JSON.stringify({ title: t, author: author.trim() || null, status: addStatus }),
       });
       if (!res.ok) {
@@ -144,62 +184,67 @@ export default function DashboardPage() {
   };
 
   const updateStatus = async (id: string, newStatus: "wishlist" | "reading" | "completed") => {
-  if (!id) { 
-    console.error("updateStatus: missing id (not sending request)"); 
-    setError("Cannot update: missing id"); 
-    return; 
-  }
-
-  const prev = books;
-  setBooks(prev => prev.map(b => (b.id === id ? { ...b, status: newStatus } : b)));
-  setOpenMenuId(null);
-
-  try {
-    const url = `/api/books/${id}`;
-    console.log("PATCH", url);
-    const res = await fetch(url, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(txt || `Server ${res.status}`);
+    if (!id) {
+      console.error("updateStatus: missing id (not sending request)");
+      setError("Cannot update: missing id");
+      return;
     }
-  } catch (e) {
-    logUnknownError(e, "updateStatus error:");
-    setError("Failed to update status (see console).");
-    setBooks(prev); // rollback
-  }
-};
-
-const removeBook = async (id: string) => {
-  if (!id) { 
-    console.error("removeBook: missing id (not sending request)"); 
-    setError("Cannot delete: missing id"); 
-    return; 
-  }
-  if (!confirm("Delete this book?")) return;
-
-  const prev = books;
-  setBooks(p => p.filter(b => b.id !== id));
-
-  try {
-    const url = `/api/books/${id}`;
-    console.log("DELETE", url);
-    const res = await fetch(url, { method: "DELETE", cache: "no-store" });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(txt || `Server ${res.status}`);
+    if (!token) {
+      setError("Not signed in");
+      return;
     }
-  } catch (e) {
-    logUnknownError(e, "removeBook error:");
-    setError("Delete failed (see console).");
-    setBooks(prev); // rollback
-  }
-};
 
+    const prev = books;
+    setBooks((p) => p.map((b) => (b.id === id ? { ...b, status: newStatus } : b)));
+    setOpenMenuId(null);
+
+    try {
+      const url = `/api/books/${id}`;
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: authHeaders({ "Content-Type": "application/json" }), // ✅ send token
+        body: JSON.stringify({ status: newStatus }),
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(txt || `Server ${res.status}`);
+      }
+    } catch (e) {
+      logUnknownError(e, "updateStatus error:");
+      setError("Failed to update status (see console).");
+      setBooks(prev); // rollback
+    }
+  };
+
+  const removeBook = async (id: string) => {
+    if (!id) {
+      console.error("removeBook: missing id (not sending request)");
+      setError("Cannot delete: missing id");
+      return;
+    }
+    if (!token) {
+      setError("Not signed in");
+      return;
+    }
+    if (!confirm("Delete this book?")) return;
+
+    const prev = books;
+    setBooks((p) => p.filter((b) => b.id !== id));
+
+    try {
+      const url = `/api/books/${id}`;
+      const res = await fetch(url, { method: "DELETE", headers: authHeaders(), cache: "no-store" }); // ✅ send token
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(txt || `Server ${res.status}`);
+      }
+    } catch (e) {
+      logUnknownError(e, "removeBook error:");
+      setError("Delete failed (see console).");
+      setBooks(prev); // rollback
+    }
+  };
 
   const visible = books
     .filter((b) => (filterStatus === "all" ? true : b.status === filterStatus))
@@ -317,6 +362,13 @@ const removeBook = async (id: string) => {
           </div>
         </div>
 
+        {/* Not signed in notice */}
+        {!token && (
+          <div style={{ color: "#ff8080", marginBottom: 12 }}>
+            You’re not signed in. Go to the home page and sign in first.
+          </div>
+        )}
+
         {/* Search Row */}
         <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
           <input
@@ -350,18 +402,8 @@ const removeBook = async (id: string) => {
 
         {/* Add Row */}
         <form onSubmit={onAdd} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
-          <input
-            placeholder="Title (required)"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={inputBase}
-          />
-          <input
-            placeholder="Author (optional)"
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
-            style={{ ...inputBase, width: 320 }}
-          />
+          <input placeholder="Title (required)" value={title} onChange={(e) => setTitle(e.target.value)} style={inputBase} />
+          <input placeholder="Author (optional)" value={author} onChange={(e) => setAuthor(e.target.value)} style={{ ...inputBase, width: 320 }} />
           <select
             value={addStatus}
             onChange={(e) => setAddStatus(e.target.value as "wishlist" | "reading" | "completed")}
@@ -508,8 +550,8 @@ const removeBook = async (id: string) => {
         </div>
 
         <div style={{ marginTop: 12, color: muted, fontSize: 13 }}>
-          Tip: click a colored pill to open the menu. If you see &quot;Unauthorized&quot; in console, ensure SUPABASE
-          keys are set in <code>.env.local</code>.
+          Tip: click a colored pill to open the menu. If you see &quot;Unauthorized&quot; in console, make sure you’re signed in and the
+          dashboard is sending the access token.
         </div>
       </div>
     </div>
