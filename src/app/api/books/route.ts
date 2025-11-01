@@ -3,8 +3,8 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { serverSupabase } from "@/lib/supabaseServer";
+import { getUserFromAuthHeader } from "@/lib/authServer";
 
-// Define the shape of a row in your "books" table
 interface BookRow {
   id: string;
   title: string;
@@ -19,23 +19,22 @@ interface PostBody {
   status?: string;
 }
 
-interface JsonError {
-  error: string;
-}
+type JsonError = { error: string };
 
-// GET /api/books — fetch all books
-export async function GET(): Promise<NextResponse<BookRow[] | JsonError>> {
+// GET /api/books — fetch books for current user
+export async function GET(req: Request): Promise<NextResponse<BookRow[] | JsonError>> {
+  const user = await getUserFromAuthHeader(req.headers.get("authorization") ?? undefined);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { data, error } = await serverSupabase
       .from("books")
       .select("id, title, author, status, created_at")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .returns<BookRow[]>();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json(data ?? []);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown server error";
@@ -43,34 +42,30 @@ export async function GET(): Promise<NextResponse<BookRow[] | JsonError>> {
   }
 }
 
-// POST /api/books — insert a new book
+// POST /api/books — insert a new book for current user
 export async function POST(req: Request): Promise<NextResponse<BookRow | JsonError>> {
+  const user = await getUserFromAuthHeader(req.headers.get("authorization") ?? undefined);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const body: PostBody = await req.json().catch(() => ({}));
+    const title = (body.title ?? "").trim();
+    if (!title) return NextResponse.json({ error: "Title is required" }, { status: 400 });
 
-    const titleRaw = (body.title ?? "").trim();
-    if (!titleRaw) {
-      return NextResponse.json({ error: "Title is required" }, { status: 400 });
-    }
-
-    const authorRaw = body.author?.trim?.() ?? null;
+    const author = body.author?.trim?.() ?? null;
     const allowed = ["wishlist", "reading", "completed"] as const;
-    const status =
-      allowed.includes(body.status as (typeof allowed)[number])
-        ? (body.status as (typeof allowed)[number])
-        : "wishlist";
+    const status = allowed.includes(body.status as (typeof allowed)[number])
+      ? (body.status as (typeof allowed)[number])
+      : "wishlist";
 
     const { data, error } = await serverSupabase
       .from("books")
-      .insert({ title: titleRaw, author: authorRaw, status })
+      .insert({ title, author, status, user_id: user.id })
       .select("id, title, author, status, created_at")
       .single()
       .returns<BookRow>();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json(data, { status: 201 });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown server error";
