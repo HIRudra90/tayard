@@ -1,4 +1,4 @@
-﻿// src/app/dashboard/page.tsx
+﻿﻿// src/app/dashboard/page.tsx
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -16,24 +16,6 @@ const STATUS_ORDER: Array<"wishlist" | "reading" | "completed"> = ["wishlist", "
 function formatIsoTimestamp(iso?: string | null) {
   if (!iso) return "";
   return iso.replace("T", " ").split(".")[0];
-}
-
-// --- type guards (removes any) ---
-function isBook(obj: unknown): obj is Book {
-  if (typeof obj !== "object" || obj === null) return false;
-  const o = obj as Record<string, unknown>;
-  return typeof o.id === "string" && typeof o.title === "string";
-}
-function isBookArray(data: unknown): data is Book[] {
-  return Array.isArray(data) && data.every(isBook);
-}
-function getBooksFromUnknown(data: unknown): Book[] {
-  if (isBookArray(data)) return data;
-  if (typeof data === "object" && data !== null && "books" in data) {
-    const books = (data as { books?: unknown }).books;
-    if (isBookArray(books)) return books;
-  }
-  return [];
 }
 
 export default function DashboardPage() {
@@ -75,8 +57,8 @@ export default function DashboardPage() {
         const txt = await res.text().catch(() => "Failed to read error body");
         throw new Error(txt || `Server responded ${res.status}`);
       }
-      const data: unknown = await res.json();
-      setBooks(getBooksFromUnknown(data));
+      const data = await res.json();
+      setBooks(Array.isArray(data) ? data : Array.isArray((data as any)?.books) ? (data as any).books : []);
     } catch (e: unknown) {
       logUnknownError(e, "fetchBooks error:");
       setError("Failed to load books (see console).");
@@ -144,62 +126,40 @@ export default function DashboardPage() {
   };
 
   const updateStatus = async (id: string, newStatus: "wishlist" | "reading" | "completed") => {
-  if (!id) { 
-    console.error("updateStatus: missing id (not sending request)"); 
-    setError("Cannot update: missing id"); 
-    return; 
-  }
-
-  const prev = books;
-  setBooks(prev => prev.map(b => (b.id === id ? { ...b, status: newStatus } : b)));
-  setOpenMenuId(null);
-
-  try {
-    const url = `/api/books/${id}`;
-    console.log("PATCH", url);
-    const res = await fetch(url, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(txt || `Server ${res.status}`);
+    setBooks((prev) => prev.map((b) => (b.id === id ? { ...b, status: newStatus } : b)));
+    setOpenMenuId(null);
+    try {
+      const res = await fetch(`/api/books/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "server error");
+        throw new Error(txt || `Server ${res.status}`);
+      }
+    } catch (e: unknown) {
+      logUnknownError(e, "updateStatus error:");
+      setError("Failed to update status (see console).");
+      fetchBooks();
     }
-  } catch (e) {
-    logUnknownError(e, "updateStatus error:");
-    setError("Failed to update status (see console).");
-    setBooks(prev); // rollback
-  }
-};
+  };
 
-const removeBook = async (id: string) => {
-  if (!id) { 
-    console.error("removeBook: missing id (not sending request)"); 
-    setError("Cannot delete: missing id"); 
-    return; 
-  }
-  if (!confirm("Delete this book?")) return;
-
-  const prev = books;
-  setBooks(p => p.filter(b => b.id !== id));
-
-  try {
-    const url = `/api/books/${id}`;
-    console.log("DELETE", url);
-    const res = await fetch(url, { method: "DELETE", cache: "no-store" });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(txt || `Server ${res.status}`);
+  const removeBook = async (id: string) => {
+    if (!confirm("Delete this book?")) return;
+    try {
+      const res = await fetch(`/api/books/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "server error");
+        throw new Error(txt || `Server ${res.status}`);
+      }
+      setBooks((prev) => prev.filter((b) => b.id !== id));
+    } catch (e: unknown) {
+      logUnknownError(e, "removeBook error:");
+      setError("Delete failed (see console).");
+      fetchBooks();
     }
-  } catch (e) {
-    logUnknownError(e, "removeBook error:");
-    setError("Delete failed (see console).");
-    setBooks(prev); // rollback
-  }
-};
-
+  };
 
   const visible = books
     .filter((b) => (filterStatus === "all" ? true : b.status === filterStatus))
@@ -304,7 +264,7 @@ const removeBook = async (id: string) => {
       <div style={wrapper} ref={containerRef}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div>
-            <h1>📚 Your Books</h1>
+            <h1>Your Books</h1>
             <p style={{ color: muted }}>Dashboard To Get Hired</p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -319,12 +279,7 @@ const removeBook = async (id: string) => {
 
         {/* Search Row */}
         <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
-          <input
-            placeholder="Search by title or author"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ ...inputBase, flex: 1 }}
-          />
+          <input placeholder="Search by title or author" value={search} onChange={(e) => setSearch(e.target.value)} style={{ ...inputBase, flex: 1 }} />
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as "all" | "wishlist" | "reading" | "completed")}
@@ -350,18 +305,8 @@ const removeBook = async (id: string) => {
 
         {/* Add Row */}
         <form onSubmit={onAdd} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
-          <input
-            placeholder="Title (required)"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={inputBase}
-          />
-          <input
-            placeholder="Author (optional)"
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
-            style={{ ...inputBase, width: 320 }}
-          />
+          <input placeholder="Title (required)" value={title} onChange={(e) => setTitle(e.target.value)} style={inputBase} />
+          <input placeholder="Author (optional)" value={author} onChange={(e) => setAuthor(e.target.value)} style={{ ...inputBase, width: 320 }} />
           <select
             value={addStatus}
             onChange={(e) => setAddStatus(e.target.value as "wishlist" | "reading" | "completed")}
@@ -398,7 +343,11 @@ const removeBook = async (id: string) => {
           </div>
         </form>
 
-        {error && <div style={{ color: "#ff8080", marginTop: 8 }}>{error}</div>}
+        {error && (
+          <div style={{ color: "#ff8080", marginTop: 8 }}>
+            {error}
+          </div>
+        )}
 
         <div style={{ display: "grid", gap: 14, marginTop: 12 }}>
           {loading ? (
@@ -432,15 +381,7 @@ const removeBook = async (id: string) => {
                           color: meta.text,
                         }}
                       >
-                        <span
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: 999,
-                            background: "#ffffff55",
-                            display: "inline-block",
-                          }}
-                        />
+                        <span style={{ width: 10, height: 10, borderRadius: 999, background: "#ffffff55", display: "inline-block" }} />
                         <span style={{ textTransform: "capitalize" }}>{st}</span>
                       </div>
 
@@ -455,24 +396,9 @@ const removeBook = async (id: string) => {
                                 key={s}
                                 role="button"
                                 onClick={() => updateStatus(b.id, s)}
-                                style={{
-                                  padding: "12px 14px",
-                                  cursor: "pointer",
-                                  background: itemBg,
-                                  color: textColor,
-                                  fontWeight: 800,
-                                }}
+                                style={{ padding: "12px 14px", cursor: "pointer", background: itemBg, color: textColor, fontWeight: 800 }}
                               >
-                                <span
-                                  style={{
-                                    width: 10,
-                                    height: 10,
-                                    borderRadius: 999,
-                                    background: m.bg,
-                                    display: "inline-block",
-                                    marginRight: 10,
-                                  }}
-                                />
+                                <span style={{ width: 10, height: 10, borderRadius: 999, background: m.bg, display: "inline-block", marginRight: 10 }} />
                                 <span style={{ textTransform: "capitalize" }}>{s}</span>
                               </div>
                             );
@@ -481,23 +407,11 @@ const removeBook = async (id: string) => {
                       )}
                     </div>
 
-                    <button
-                      onClick={() => removeBook(b.id)}
-                      style={{
-                        padding: "10px 14px",
-                        borderRadius: 6,
-                        background: "#2563eb",
-                        color: "#fff",
-                        fontWeight: 700,
-                        border: "none",
-                      }}
-                    >
+                    <button onClick={() => removeBook(b.id)} style={{ padding: "10px 14px", borderRadius: 6, background: "#2563eb", color: "#fff", fontWeight: 700, border: "none" }}>
                       Delete
                     </button>
 
-                    <div style={{ color: muted, fontSize: 12 }}>
-                      {b.created_at ? formatIsoTimestamp(b.created_at) : ""}
-                    </div>
+                    <div style={{ color: muted, fontSize: 12 }}>{b.created_at ? formatIsoTimestamp(b.created_at) : ""}</div>
                   </div>
                 </div>
               );
@@ -508,8 +422,7 @@ const removeBook = async (id: string) => {
         </div>
 
         <div style={{ marginTop: 12, color: muted, fontSize: 13 }}>
-          Tip: click a colored pill to open the menu. If you see &quot;Unauthorized&quot; in console, ensure SUPABASE
-          keys are set in <code>.env.local</code>.
+          Tip: click a colored pill to open the menu. If you see &quot;Unauthorized&quot; in console, ensure SUPABASE keys are set in <code>.env.local</code>.
         </div>
       </div>
     </div>

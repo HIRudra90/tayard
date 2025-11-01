@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient"; // <- use alias
 
 // Safe error -> message helper (no `any`)
 function getErrorMessage(e: unknown): string {
@@ -23,8 +23,11 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
+    let mounted = true;
+
     // Check existing session
     supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return;
       if (error) console.warn("getSession error:", error.message);
       const session = data?.session ?? null;
       setSessionInfo(session);
@@ -35,9 +38,8 @@ export default function HomePage() {
     });
 
     // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
       setSessionInfo(session ?? null);
       if (session && !navigating.current) {
         navigating.current = true;
@@ -45,7 +47,10 @@ export default function HomePage() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      data.subscription.unsubscribe();
+    };
   }, [router]);
 
   const handleSignInWithGoogle = async () => {
@@ -175,4 +180,3 @@ export default function HomePage() {
     </main>
   );
 }
-

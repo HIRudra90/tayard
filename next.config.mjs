@@ -1,13 +1,8 @@
-/** @type {import('next').NextConfig} */
+﻿/** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    // ? Skip ESLint errors during build (for Vercel deploy)
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    // ? Skip TypeScript errors during Vercel build (optional safety)
-    ignoreBuildErrors: true,
-  },
+  // Empty turbopack block silences the warning and opts you into Turbopack.
+  turbopack: {},
+  // NOTE: Removed the custom webpack() alias. Prefer tsconfig paths or relative imports.
 };
 
 export default nextConfig;
