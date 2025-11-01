@@ -2,9 +2,6 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import type { Session } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabaseClient";
 
 type Book = {
   id: string;
@@ -40,13 +37,6 @@ function getBooksFromUnknown(data: unknown): Book[] {
 }
 
 export default function DashboardPage() {
-  const router = useRouter();
-
-  // --- auth state (for auto-redirect + logout) ---
-  const [session, setSession] = useState<Session | null>(null);
-  const [booted, setBooted] = useState(false);
-
-  // --- app state ---
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -76,46 +66,11 @@ export default function DashboardPage() {
     }
   }
 
-  // --- auth guard + listener ---
-  useEffect(() => {
-    let mounted = true;
-
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (!mounted) return;
-      if (error) console.warn("getSession error:", error.message);
-      const s = data?.session ?? null;
-      setSession(s);
-      setBooted(true);
-      if (!s) router.replace("/"); // protect dashboard
-    });
-
-    const { data } = supabase.auth.onAuthStateChange((_event, s) => {
-      if (!mounted) return;
-      setSession(s ?? null);
-      if (!s) router.replace("/");
-    });
-
-    return () => {
-      mounted = false;
-      data.subscription.unsubscribe();
-    };
-  }, [router]);
-
-  const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      setSession(null);
-      router.replace("/");
-    } catch (e) {
-      console.error("signOut error:", e);
-    }
-  };
-
   const fetchBooks = async (): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/books", { cache: "no-store" });
+      const res = await fetch("/api/books");
       if (!res.ok) {
         const txt = await res.text().catch(() => "Failed to read error body");
         throw new Error(txt || `Server responded ${res.status}`);
@@ -189,61 +144,62 @@ export default function DashboardPage() {
   };
 
   const updateStatus = async (id: string, newStatus: "wishlist" | "reading" | "completed") => {
-    if (!id) {
-      console.error("updateStatus: missing id (not sending request)");
-      setError("Cannot update: missing id");
-      return;
+  if (!id) { 
+    console.error("updateStatus: missing id (not sending request)"); 
+    setError("Cannot update: missing id"); 
+    return; 
+  }
+
+  const prev = books;
+  setBooks(prev => prev.map(b => (b.id === id ? { ...b, status: newStatus } : b)));
+  setOpenMenuId(null);
+
+  try {
+    const url = `/api/books/${id}`;
+    console.log("PATCH", url);
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(txt || `Server ${res.status}`);
     }
+  } catch (e) {
+    logUnknownError(e, "updateStatus error:");
+    setError("Failed to update status (see console).");
+    setBooks(prev); // rollback
+  }
+};
 
-    const prev = books;
-    setBooks((p) => p.map((b) => (b.id === id ? { ...b, status: newStatus } : b)));
-    setOpenMenuId(null);
+const removeBook = async (id: string) => {
+  if (!id) { 
+    console.error("removeBook: missing id (not sending request)"); 
+    setError("Cannot delete: missing id"); 
+    return; 
+  }
+  if (!confirm("Delete this book?")) return;
 
-    try {
-      const url = `/api/books/${id}`;
-      console.log("PATCH", url);
-      const res = await fetch(url, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-        cache: "no-store",
-      });
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(txt || `Server ${res.status}`);
-      }
-    } catch (e) {
-      logUnknownError(e, "updateStatus error:");
-      setError("Failed to update status (see console).");
-      setBooks(prev); // rollback
+  const prev = books;
+  setBooks(p => p.filter(b => b.id !== id));
+
+  try {
+    const url = `/api/books/${id}`;
+    console.log("DELETE", url);
+    const res = await fetch(url, { method: "DELETE", cache: "no-store" });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(txt || `Server ${res.status}`);
     }
-  };
+  } catch (e) {
+    logUnknownError(e, "removeBook error:");
+    setError("Delete failed (see console).");
+    setBooks(prev); // rollback
+  }
+};
 
-  const removeBook = async (id: string) => {
-    if (!id) {
-      console.error("removeBook: missing id (not sending request)");
-      setError("Cannot delete: missing id");
-      return;
-    }
-    if (!confirm("Delete this book?")) return;
-
-    const prev = books;
-    setBooks((p) => p.filter((b) => b.id !== id));
-
-    try {
-      const url = `/api/books/${id}`;
-      console.log("DELETE", url);
-      const res = await fetch(url, { method: "DELETE", cache: "no-store" });
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(txt || `Server ${res.status}`);
-      }
-    } catch (e) {
-      logUnknownError(e, "removeBook error:");
-      setError("Delete failed (see console).");
-      setBooks(prev); // rollback
-    }
-  };
 
   const visible = books
     .filter((b) => (filterStatus === "all" ? true : b.status === filterStatus))
@@ -343,15 +299,6 @@ export default function DashboardPage() {
     minWidth: 160,
   };
 
-  // Splash while checking auth
-  if (!booted) {
-    return (
-      <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#0b0b0b", color: "#fff" }}>
-        <div>Loading…</div>
-      </main>
-    );
-  }
-
   return (
     <div style={page}>
       <div style={wrapper} ref={containerRef}>
@@ -366,9 +313,6 @@ export default function DashboardPage() {
             </button>
             <button onClick={fetchBooks} style={buttonGhost}>
               Refresh
-            </button>
-            <button onClick={handleSignOut} style={buttonGhost} title={session?.user?.email ?? "Log out"}>
-              Log out
             </button>
           </div>
         </div>
@@ -406,8 +350,18 @@ export default function DashboardPage() {
 
         {/* Add Row */}
         <form onSubmit={onAdd} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
-          <input placeholder="Title (required)" value={title} onChange={(e) => setTitle(e.target.value)} style={inputBase} />
-          <input placeholder="Author (optional)" value={author} onChange={(e) => setAuthor(e.target.value)} style={{ ...inputBase, width: 320 }} />
+          <input
+            placeholder="Title (required)"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            style={inputBase}
+          />
+          <input
+            placeholder="Author (optional)"
+            value={author}
+            onChange={(e) => setAuthor(e.target.value)}
+            style={{ ...inputBase, width: 320 }}
+          />
           <select
             value={addStatus}
             onChange={(e) => setAddStatus(e.target.value as "wishlist" | "reading" | "completed")}
