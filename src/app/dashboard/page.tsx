@@ -2,7 +2,9 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabaseClient"; // ✅ added to read access token
+import { useRouter } from "next/navigation";
+import type { Session } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
 
 type Book = {
   id: string;
@@ -37,15 +39,23 @@ function getBooksFromUnknown(data: unknown): Book[] {
   return [];
 }
 
-// ✅ helper to attach Authorization header
-async function withAuth(extra?: HeadersInit): Promise<HeadersInit> {
+// ✅ Add this: attaches Supabase access token to requests
+async function withAuth(extra?: HeadersInit): Promise<Headers> {
+  const headers = new Headers(extra);
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  const base: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-  return { ...(extra as Record<string, string> | undefined), ...base };
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return headers;
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
+
+  // --- auth state (for auto-redirect + logout) ---
+  const [session, setSession] = useState<Session | null>(null);
+  const [booted, setBooted] = useState(false);
+
+  // --- app state ---
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -75,12 +85,47 @@ export default function DashboardPage() {
     }
   }
 
+  // --- auth guard + listener ---
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return;
+      if (error) console.warn("getSession error:", error.message);
+      const s = data?.session ?? null;
+      setSession(s);
+      setBooted(true);
+      if (!s) router.replace("/"); // protect dashboard
+    });
+
+    const { data } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (!mounted) return;
+      setSession(s ?? null);
+      if (!s) router.replace("/");
+    });
+
+    return () => {
+      mounted = false;
+      data.subscription.unsubscribe();
+    };
+  }, [router]);
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      setSession(null);
+      router.replace("/");
+    } catch (e) {
+      console.error("signOut error:", e);
+    }
+  };
+
   const fetchBooks = async (): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/books", {
-        headers: await withAuth(),
+        headers: await withAuth(),           // 👈 send token
         cache: "no-store",
       });
       if (!res.ok) {
@@ -136,7 +181,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch("/api/books", {
         method: "POST",
-        headers: await withAuth({ "Content-Type": "application/json" }),
+        headers: await withAuth({ "Content-Type": "application/json" }), // 👈 send token
         body: JSON.stringify({ title: t, author: author.trim() || null, status: addStatus }),
       });
       if (!res.ok) {
@@ -163,7 +208,7 @@ export default function DashboardPage() {
     }
 
     const prev = books;
-    setBooks((prev) => prev.map((b) => (b.id === id ? { ...b, status: newStatus } : b)));
+    setBooks((p) => p.map((b) => (b.id === id ? { ...b, status: newStatus } : b)));
     setOpenMenuId(null);
 
     try {
@@ -171,7 +216,7 @@ export default function DashboardPage() {
       console.log("PATCH", url);
       const res = await fetch(url, {
         method: "PATCH",
-        headers: await withAuth({ "Content-Type": "application/json" }),
+        headers: await withAuth({ "Content-Type": "application/json" }), // 👈 send token
         body: JSON.stringify({ status: newStatus }),
         cache: "no-store",
       });
@@ -200,7 +245,11 @@ export default function DashboardPage() {
     try {
       const url = `/api/books/${id}`;
       console.log("DELETE", url);
-      const res = await fetch(url, { method: "DELETE", cache: "no-store", headers: await withAuth() });
+      const res = await fetch(url, {
+        method: "DELETE",
+        cache: "no-store",
+        headers: await withAuth(), // 👈 send token
+      });
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
         throw new Error(txt || `Server ${res.status}`);
@@ -310,6 +359,15 @@ export default function DashboardPage() {
     minWidth: 160,
   };
 
+  // Splash while checking auth
+  if (!booted) {
+    return (
+      <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#0b0b0b", color: "#fff" }}>
+        <div>Loading…</div>
+      </main>
+    );
+  }
+
   return (
     <div style={page}>
       <div style={wrapper} ref={containerRef}>
@@ -324,6 +382,9 @@ export default function DashboardPage() {
             </button>
             <button onClick={fetchBooks} style={buttonGhost}>
               Refresh
+            </button>
+            <button onClick={handleSignOut} style={buttonGhost} title={session?.user?.email ?? "Log out"}>
+              Log out
             </button>
           </div>
         </div>
@@ -361,18 +422,8 @@ export default function DashboardPage() {
 
         {/* Add Row */}
         <form onSubmit={onAdd} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
-          <input
-            placeholder="Title (required)"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={inputBase}
-          />
-          <input
-            placeholder="Author (optional)"
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
-            style={{ ...inputBase, width: 320 }}
-          />
+          <input placeholder="Title (required)" value={title} onChange={(e) => setTitle(e.target.value)} style={inputBase} />
+          <input placeholder="Author (optional)" value={author} onChange={(e) => setAuthor(e.target.value)} style={{ ...inputBase, width: 320 }} />
           <select
             value={addStatus}
             onChange={(e) => setAddStatus(e.target.value as "wishlist" | "reading" | "completed")}
